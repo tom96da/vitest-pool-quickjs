@@ -4,12 +4,19 @@
 // JSON that survives the reference cycles of the task objects of vitest. Both ends of the pool
 // channel use it. Shared objects stay shared.
 
-/** A node of the encoded graph: an object, an array or a date. */
-type Node = Record<string, unknown> | unknown[] | { $d: number };
+/** A value that has a node of its own in the encoded graph. */
+type Tagged =
+  | { $d: number | null }
+  | { $r: string; f: string }
+  | { $m: [unknown, unknown][] }
+  | { $s: unknown[] };
+
+/** A node of the encoded graph: an object, an array or a tagged value. */
+type Node = Record<string, unknown> | unknown[] | Tagged;
 
 /**
- * Encodes a value into text that `decode` turns back. A function and a symbol become `null`.
- * A RegExp, a Map, a Set and a typed array become an empty object. Objects, arrays, dates,
+ * Encodes a value into text that `decode` turns back. A function and a symbol become `null`, and
+ * a typed array becomes an empty object. Objects, arrays, dates, regular expressions, maps, sets,
  * bigints, strings, numbers and booleans round-trip.
  * @param root - the value to encode
  * @returns the text
@@ -20,6 +27,7 @@ export function encode(root: unknown): string {
   const enc = (v: unknown): unknown => {
     if (typeof v === "function" || typeof v === "symbol") return null;
     if (typeof v === "bigint") return { $b: String(v) };
+    if (typeof v === "number" && !Number.isFinite(v)) return { $n: String(v) };
     if (v === undefined) return { $u: 1 };
     if (typeof v !== "object" || v === null) return v;
     const known = ids.get(v);
@@ -27,7 +35,10 @@ export function encode(root: unknown): string {
     const id = nodes.length;
     ids.set(v, id);
     nodes.push([]);
-    if (v instanceof Date) nodes[id] = { $d: v.getTime() };
+    if (v instanceof Date) nodes[id] = { $d: Number.isNaN(v.getTime()) ? null : v.getTime() };
+    else if (v instanceof RegExp) nodes[id] = { $r: v.source, f: v.flags };
+    else if (v instanceof Map) nodes[id] = { $m: Array.from(v, ([k, x]) => [enc(k), enc(x)]) };
+    else if (v instanceof Set) nodes[id] = { $s: Array.from(v, enc) };
     else if (Array.isArray(v)) nodes[id] = v.map(enc);
     else {
       const src = v as Record<string, unknown>;
@@ -54,9 +65,10 @@ export function decode(text: string): unknown {
   const made: unknown[] = [];
   const dec = (v: unknown): unknown => {
     if (v === null || typeof v !== "object") return v;
-    const tag = v as { $?: number; $u?: 1; $b?: string };
+    const tag = v as { $?: number; $u?: 1; $b?: string; $n?: string };
     if (tag.$u) return undefined;
     if (tag.$b !== undefined) return BigInt(tag.$b);
+    if (tag.$n !== undefined) return Number(tag.$n);
     const id = tag.$!;
     if (id in made) return made[id];
     const node = n[id]!;
@@ -66,7 +78,21 @@ export function decode(text: string): unknown {
       for (const item of node) out.push(dec(item));
       return out;
     }
-    if ("$d" in node) return (made[id] = new Date(node.$d as number));
+    const tagged = node as Tagged;
+    if ("$d" in tagged) return (made[id] = new Date(tagged.$d ?? Number.NaN));
+    if ("$r" in tagged) return (made[id] = new RegExp(tagged.$r, tagged.f));
+    if ("$m" in tagged) {
+      const out = new Map<unknown, unknown>();
+      made[id] = out;
+      for (const [k, x] of tagged.$m) out.set(dec(k), dec(x));
+      return out;
+    }
+    if ("$s" in tagged) {
+      const out = new Set<unknown>();
+      made[id] = out;
+      for (const x of tagged.$s) out.add(dec(x));
+      return out;
+    }
     const out: Record<string, unknown> = {};
     made[id] = out;
     for (const k of Object.keys(node)) out[k] = dec((node as Record<string, unknown>)[k]);
