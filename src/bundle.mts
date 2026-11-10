@@ -55,7 +55,7 @@ async function inert(id: string): Promise<string> {
   );
   const literal = (v: unknown): string =>
     typeof v === "function"
-      ? "() => {}"
+      ? "function () {}"
       : Array.isArray(v)
         ? "[]"
         : typeof v === "string" || typeof v === "number" || typeof v === "boolean"
