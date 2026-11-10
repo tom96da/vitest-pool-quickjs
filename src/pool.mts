@@ -3,6 +3,7 @@
 
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 import variant from "@jitl/quickjs-ng-wasmfile-release-sync";
 import { newQuickJSWASMModule } from "quickjs-emscripten";
@@ -20,7 +21,10 @@ export interface QuickJSPoolOptions {
    * can import each listed specifier, for example `"@vue/runtime-core/dist/runtime-core.cjs.js"`.
    */
   externals?: string[];
-  /** Paths of scripts to run in the context before the tests, for example to define globals. */
+  /**
+   * Paths of scripts to run in the context before the tests, for example to define globals. A
+   * relative path starts at the root of the project.
+   */
   preludes?: string[];
   /** Source of `node:*` modules by id. It wins over the modules that the pool provides. */
   modules?: Record<string, string>;
@@ -219,28 +223,29 @@ class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
  * @returns the pool to assign to `test.pool`
  */
 export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitializer {
-  const builds = new Map<string, Promise<Prepared>>();
-  const prepared = (root: string): Promise<Prepared> => {
+  // the build is the slow part, so it is kept for the root; the scripts are read at every start
+  const builds = new Map<string, Promise<string>>();
+  const prepared = async (root: string): Promise<Prepared> => {
     if (!builds.has(root)) {
       builds.set(
         root,
-        (async () => ({
-          worker: await buildWorker({
-            root,
-            externals: options.externals ?? [],
-            modules: options.modules ?? {},
-            plugins: options.plugins ?? [],
-          }),
-          preludes: await Promise.all(
-            (options.preludes ?? []).map(async (file) => ({
-              name: file,
-              code: await readFile(file, "utf8"),
-            })),
-          ),
-        }))(),
+        buildWorker({
+          root,
+          externals: options.externals ?? [],
+          modules: options.modules ?? {},
+          plugins: options.plugins ?? [],
+        }),
       );
     }
-    return builds.get(root)!;
+    return {
+      worker: await builds.get(root)!,
+      preludes: await Promise.all(
+        (options.preludes ?? []).map(async (file) => ({
+          name: file,
+          code: await readFile(path.resolve(root, file), "utf8"),
+        })),
+      ),
+    };
   };
   return {
     name: "quickjs",
