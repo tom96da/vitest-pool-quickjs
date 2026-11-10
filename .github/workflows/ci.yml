@@ -1,0 +1,122 @@
+# Copyright (c) 2026 tom96da
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: CI
+
+permissions: {}
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  changed:
+    name: Detect changed
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      js: ${{ steps.filter.outputs.js }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Filter paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            js:
+              - 'src/**'
+              - 'tests/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig*.json'
+              - 'oxlint.config.ts'
+              - 'oxfmt.config.ts'
+              - 'vitest.config.mts'
+              - 'tsdown.config.mts'
+              - '.github/workflows/ci.yml'
+
+  test:
+    name: Test
+    needs: changed
+    if: needs.changed.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set node version to 26
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm ci
+
+      - name: Build
+        run: pnpm exec tsdown
+
+      - name: Run tests
+        run: pnpm exec vitest run
+
+  check:
+    name: Check
+    needs: changed
+    if: needs.changed.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set node version to 26
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm ci
+
+      - name: Lint
+        run: pnpm exec oxlint --type-aware
+
+      - name: Format
+        run: pnpm exec oxfmt --check
+
+      - name: Type check
+        run: pnpm exec tsc --noEmit
+
+  passed:
+    name: CI Passed
+    if: always()
+    needs: [changed, test, check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check job results
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
