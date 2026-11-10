@@ -152,9 +152,9 @@ export async function buildWorker(options: BuildOptions): Promise<string> {
   const build = await rolldown({
     input: workerEntry(),
     platform: "neutral",
-    shimMissingExports: true,
     resolve: { conditionNames: ["import", "default"], mainFields: ["module", "main"] },
     checks: { bundlerTimings: false },
+    // the optional environments of vitest (jsdom, happy-dom) are not installed and not used
     onLog() {},
     plugins: [
       externalModules(options.externals, options.root),

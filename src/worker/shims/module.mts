@@ -3,4 +3,6 @@
 
 export const builtinModules: string[] = [];
 export const createRequire = () => () => ({});
-export default { createRequire, builtinModules };
+export const isBuiltin = (): boolean => false;
+export const syncBuiltinESMExports = (): void => {};
+export default { createRequire, builtinModules, isBuiltin, syncBuiltinESMExports };
