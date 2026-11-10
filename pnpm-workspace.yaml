@@ -1,0 +1,6 @@
+# Copyright (c) 2026 tom96da
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+packages: []
+overrides:
+  "@arethetypeswrong/core>typescript": "npm:@typescript/typescript6@6.0.2"

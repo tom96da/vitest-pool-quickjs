@@ -1,6 +1,6 @@
 {
   "name": "vitest-pool-quickjs",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "A Vitest pool that runs test files in QuickJS.",
   "keywords": [
     "quickjs",
@@ -17,27 +17,49 @@
     "type": "git",
     "url": "git+https://github.com/tom96da/vitest-pool-quickjs.git"
   },
+  "files": [
+    "dist",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
+    "build": "tsdown",
     "pretest": "pnpm build",
     "test": "vitest run",
     "lint": "oxlint --type-aware",
     "format": "oxfmt --check .",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "prepack": "clear-package-json package.json -o package.json"
   },
   "dependencies": {
     "@jitl/quickjs-ng-wasmfile-release-sync": "^0.32.0",
     "pathe": "^2.0.3",
     "quickjs-emscripten": "^0.32.0",
-    "rolldown": "~1.2.15"
+    "rolldown": "~1.2.18"
   },
   "devDependencies": {
+    "@arethetypeswrong/core": "^0.18.5",
     "@types/node": "^26.6.6",
     "@typescript/native": "npm:typescript@7.1.0-beta",
+    "clean-publish": "^7.1.0",
     "oxfmt": "^0.77.0",
     "oxlint": "^1.92.0",
     "oxlint-tsgolint": "^7.0.2006",
+    "publint": "0.3.25",
     "ts-dedent": "^2.3.0",
+    "tsdown": "^0.23.2",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vitest": "^5.0.3"
   },
