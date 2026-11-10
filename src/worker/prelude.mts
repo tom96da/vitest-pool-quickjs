@@ -124,15 +124,24 @@ Object.defineProperty(Error, "prepareStackTrace", {
       for (const t of queue.values()) next = Math.min(next, t.at);
       return next === Infinity ? -1 : Math.max(0, next - __now());
     },
+    // runs the earliest due timer and returns 1, or returns 0 when none is due
     __fireTimers: () => {
       const now = __now();
-      // a copy: a callback can add and clear timers
-      for (const [id, t] of Array.from(queue)) {
-        if (t.at > now) continue;
-        if (t.repeat) t.at = now + t.wait;
-        else queue.delete(id);
+      let first: [number, Timer] | undefined;
+      for (const entry of queue)
+        if (entry[1].at <= now && (!first || entry[1].at < first[1].at)) first = entry;
+      if (!first) return 0;
+      const [id, t] = first;
+      if (t.repeat) t.at = now + t.wait;
+      else queue.delete(id);
+      try {
         t.cb(...t.args);
+      } catch (error) {
+        const handlers = proc.listeners("uncaughtException");
+        if (handlers.length === 0) throw error;
+        for (const handler of handlers) handler(error);
       }
+      return 1;
     },
   });
 }

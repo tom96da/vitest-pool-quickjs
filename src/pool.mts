@@ -97,7 +97,12 @@ class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
   }
 
   send(message: WorkerRequest): void {
-    this.call("__onMessage", encode(message));
+    if (!this.vm) return;
+    try {
+      this.call("__onMessage", encode(message));
+    } catch (error) {
+      this.emit("error", error);
+    }
     this.pump();
   }
 
@@ -176,7 +181,10 @@ class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
     }
   }
 
-  /** Runs the pending jobs and due timers, then sleeps until the next timer. */
+  /**
+   * Runs the pending jobs and the due timers, one timer at a time with the jobs of its promises
+   * in between, then sleeps until the next timer. The sleep is set even when a step threw.
+   */
   private pump(): void {
     clearTimeout(this.timer);
     if (!this.vm) return;
@@ -184,10 +192,19 @@ class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
       this.drain();
       this.call("__flushRejections");
       this.drain();
-      this.call("__fireTimers");
-      this.drain();
-      const delay = this.call("__timerDelay") as number;
-      if (delay >= 0) this.timer = setTimeout(() => this.pump(), delay);
+      while (this.call("__fireTimers") === 1) {
+        this.drain();
+        this.call("__flushRejections");
+        this.drain();
+      }
+    } catch (error) {
+      this.emit("error", error);
+    }
+    try {
+      const delay = this.call("__timerDelay");
+      if (typeof delay === "number" && delay >= 0) {
+        this.timer = setTimeout(() => this.pump(), delay);
+      }
     } catch (error) {
       this.emit("error", error);
     }
