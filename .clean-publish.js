@@ -2,5 +2,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 export default {
-  fields: ["devEngines", "packageManager"]
-}
+  fields: ["devEngines", "packageManager"],
+};
