@@ -8,6 +8,10 @@
     "vitest",
     "vitest-pool"
   ],
+  "homepage": "https://github.com/tom96da/vitest-pool-quickjs#readme",
+  "bugs": {
+    "url": "https://github.com/tom96da/vitest-pool-quickjs/issues"
+  },
   "license": "(MIT OR Apache-2.0)",
   "repository": {
     "type": "git",
