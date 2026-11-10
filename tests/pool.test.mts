@@ -44,41 +44,62 @@ beforeAll(async () => {
   });
 });
 
-describe("quickjsPool", () => {
-  describe("a failing run", () => {
-    let report: Report;
-    beforeAll(async () => {
-      report = await runFixture("fixture-failing");
-    });
+// each describe below is one run of a fixture project, and a project is never run twice at once
+describe.concurrent("a failing run", () => {
+  let report: Report;
+  beforeAll(async () => {
+    report = await runFixture("fixture-failing");
+  });
 
-    it("exits with code 1 when a test fails", () => {
-      expect(report.code).toBe(1);
-      expect(report.stdout).toContain("Tests  1 failed | 4 passed (5)");
-    });
+  it("exits with code 1 when a test fails", () => {
+    expect(report.code).toBe(1);
+    expect(report.stdout).toContain("Tests  1 failed | 4 passed (5)");
+  });
 
-    it("reports the diff of a failed assertion", () => {
-      expect(report.stderr).toContain("expected { a: 1 } to deeply equal { a: 2 }");
-    });
+  it("reports the diff of a failed assertion", () => {
+    expect(report.stderr).toContain("expected { a: 1 } to deeply equal { a: 2 }");
+  });
 
-    it("writes console.log of the context to stdout", () => {
-      expect(report.stdout).toContain("log from the context { a: 1 }");
-      expect(report.stderr).not.toContain("log from the context");
-    });
+  it("writes console.log of the context to stdout", () => {
+    expect(report.stdout).toContain("log from the context { a: 1 }");
+    expect(report.stderr).not.toContain("log from the context");
+  });
 
-    it("writes console.error of the context to stderr", () => {
-      expect(report.stderr).toContain("error from the context");
-      expect(report.stdout).not.toContain("error from the context");
-    });
+  it("writes console.error of the context to stderr", () => {
+    expect(report.stderr).toContain("error from the context");
+    expect(report.stdout).not.toContain("error from the context");
+  });
 
-    it("writes process.stdout.write of the context to stdout", () => {
-      expect(report.stdout).toContain("write to stdout from the context");
-      expect(report.stderr).not.toContain("write to stdout from the context");
-    });
+  it("writes process.stdout.write of the context to stdout", () => {
+    expect(report.stdout).toContain("write to stdout from the context");
+    expect(report.stderr).not.toContain("write to stdout from the context");
+  });
 
-    it("writes process.stderr.write of the context to stderr", () => {
-      expect(report.stderr).toContain("write to stderr from the context");
-      expect(report.stdout).not.toContain("write to stderr from the context");
-    });
+  it("writes process.stderr.write of the context to stderr", () => {
+    expect(report.stderr).toContain("write to stderr from the context");
+    expect(report.stdout).not.toContain("write to stderr from the context");
+  });
+});
+
+describe.concurrent("projects that pass", () => {
+  it.each([
+    ["fixture-node-modules", "Tests  4 passed (4)"],
+    ["fixture-prelude", "Tests  1 passed (1)"],
+    ["fixture-rejections", "Tests  6 passed (6)"],
+    ["fixture-timers", "Tests  5 passed (5)"],
+  ])("passes every test of the project %s", async (name, summary) => {
+    const { code, stdout } = await runFixture(name);
+    expect(stdout).toContain(summary);
+    expect(code).toBe(0);
+  });
+});
+
+// three runs of one project, one after another
+describe("fixture-filter", () => {
+  it("passes every test without a filter", async () => {
+    const { code, stdout } = await runFixture("fixture-filter");
+    expect(stdout).toContain("Tests  2 passed (2)");
+    expect(code).toBe(0);
   });
 
   it("runs only the tests that match a name filter", async () => {
@@ -91,17 +112,5 @@ describe("quickjsPool", () => {
     const { code, stdout, stderr } = await runFixture("fixture-filter", ["--fsModuleCache"]);
     expect(code).toBe(1);
     expect(stdout + stderr).toContain("set `fsModuleCache: false` in the test options");
-  });
-
-  it.each([
-    ["fixture-filter", "Tests  2 passed (2)"],
-    ["fixture-node-modules", "Tests  4 passed (4)"],
-    ["fixture-prelude", "Tests  1 passed (1)"],
-    ["fixture-rejections", "Tests  6 passed (6)"],
-    ["fixture-timers", "Tests  5 passed (5)"],
-  ])("passes every test of the project %s", async (name, summary) => {
-    const { code, stdout } = await runFixture(name);
-    expect(stdout).toContain(summary);
-    expect(code).toBe(0);
   });
 });

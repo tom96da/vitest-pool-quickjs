@@ -12,7 +12,7 @@ import { decode, encode } from "../src/worker/codec.mts";
  */
 const roundTrip = (value: unknown): unknown => decode(encode(value));
 
-describe("codec", () => {
+describe.concurrent("codec", () => {
   it("keeps a regular expression with its flags", () => {
     const back = roundTrip(/foo.*/gi) as RegExp;
     expect(back).toBeInstanceOf(RegExp);
