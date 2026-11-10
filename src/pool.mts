@@ -78,26 +78,40 @@ class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
     const { worker, preludes } = await this.prepare();
     const start = performance.now();
     this.runtime = (await wasm).newRuntime();
-    this.runtime.setMemoryLimit(memoryLimit);
-    const vm = (this.vm = this.runtime.newContext());
-    this.define("__stdout", (text) => void process.stdout.write(text));
-    this.define("__stderr", (text) => void process.stderr.write(text));
-    this.define("__post", (text) => queueMicrotask(() => this.emit("message", decode(text))));
-    this.define("__evalFile", (code, filename) => {
-      const result = vm.evalCode(code, filename);
-      if (result.error) {
-        const error = vm.dump(result.error);
-        result.error.dispose();
-        throw new Error(describe(error));
-      }
-      vm.setProp(vm.global, "__evalResult", result.value);
-      result.value.dispose();
-    });
-    const now = vm.newFunction("__now", () => vm.newNumber(performance.now() - start));
-    vm.setProp(vm.global, "__now", now);
-    now.dispose();
-    for (const prelude of preludes) this.run(prelude.code, prelude.name);
-    this.run(worker, "worker.js");
+    try {
+      this.runtime.setMemoryLimit(memoryLimit);
+      const vm = (this.vm = this.runtime.newContext());
+      this.define("__stdout", (text) => void process.stdout.write(text));
+      this.define("__stderr", (text) => void process.stderr.write(text));
+      this.define("__utf8", (bytes) =>
+        Buffer.from(bytes, "hex")
+          .toString("utf8")
+          .split("")
+          .map((c) => c.charCodeAt(0).toString(16).padStart(4, "0"))
+          .join(""),
+      );
+      this.define("__post", (text) => queueMicrotask(() => this.emit("message", decode(text))));
+      this.define("__evalFile", (code, filename) => {
+        const result = vm.evalCode(code, filename);
+        if (result.error) {
+          const error = vm.dump(result.error);
+          result.error.dispose();
+          throw new Error(describe(error));
+        }
+        vm.setProp(vm.global, "__evalResult", result.value);
+        result.value.dispose();
+      });
+      const now = vm.newFunction("__now", () => vm.newNumber(performance.now() - start));
+      vm.setProp(vm.global, "__now", now);
+      now.dispose();
+      for (const prelude of preludes) this.run(prelude.code, prelude.name);
+      this.run(worker, "worker.js");
+    } catch (error) {
+      // clears vm and runtime so that a later send() does nothing
+      this.vm = undefined;
+      this.runtime = undefined;
+      throw error;
+    }
   }
 
   send(message: WorkerRequest): void {
@@ -122,12 +136,13 @@ class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
   /**
    * Defines a global function of string arguments in the context.
    * @param name - the name of the global
-   * @param fn - the host function the global calls
+   * @param fn - the host function the global calls; a string it returns is the result
    */
-  private define(name: string, fn: (...args: string[]) => void): void {
+  private define(name: string, fn: (...args: string[]) => string | void): void {
     const vm = this.vm!;
     const handle = vm.newFunction(name, (...args: QuickJSHandle[]) => {
-      fn(...args.map((a) => vm.getString(a)));
+      const result = fn(...args.map((a) => vm.getString(a)));
+      return typeof result === "string" ? vm.newString(result) : undefined;
     });
     vm.setProp(vm.global, name, handle);
     handle.dispose();

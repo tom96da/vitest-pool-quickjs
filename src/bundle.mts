@@ -112,7 +112,9 @@ function externalModules(specifiers: string[], root: string): Plugin {
       const entries: string[] = [];
       for (const [i, specifier] of specifiers.entries()) {
         const resolved = await this.resolve(specifier, path.join(root, "noop.mts"));
-        imports.push(`import * as e${i} from ${JSON.stringify(specifier)};`);
+        // resolve from the project root: the generated module has no directory of its own
+        const from = resolved && !resolved.id.startsWith("\0") ? resolved.id : specifier;
+        imports.push(`import * as e${i} from ${JSON.stringify(from)};`);
         entries.push(`[${JSON.stringify(specifier)}, e${i}]`);
         if (resolved) entries.push(`[${JSON.stringify(resolved.id)}, e${i}]`);
       }

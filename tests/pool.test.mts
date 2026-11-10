@@ -85,7 +85,9 @@ describe.concurrent("projects that pass", () => {
   it.each([
     ["fixture-node-modules", "Tests  4 passed (4)"],
     ["fixture-prelude", "Tests  1 passed (1)"],
-    ["fixture-rejections", "Tests  6 passed (6)"],
+    ["fixture-process", "Tests  6 passed (6)"],
+    ["fixture-rejections", "Tests  7 passed (7)"],
+    ["fixture-text-decoder", "Tests  22 passed (22)"],
     ["fixture-timers", "Tests  5 passed (5)"],
   ])("passes every test of the project %s", async (name, summary) => {
     const { code, stdout } = await runFixture(name);

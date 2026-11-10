@@ -7,6 +7,9 @@
 /** A listener of a process event. */
 type Listener = (...args: unknown[]) => void;
 
+/** The listener that `once` registers. It holds the listener it wraps. */
+type Wrapper = Listener & { listener: Listener };
+
 /** The members of `process` that vitest reads. */
 interface Process {
   env: Record<string, string>;
@@ -21,7 +24,7 @@ interface Process {
   once(name: string, f: Listener): Process;
   off(name: string, f: Listener): Process;
   removeListener(name: string, f: Listener): Process;
-  removeAllListeners(): Process;
+  removeAllListeners(name?: string): Process;
   memoryUsage(): { heapUsed: number };
   exit(): never;
   hrtime: { (): [number, number]; bigint(): bigint };
@@ -29,8 +32,13 @@ interface Process {
   stderr: { write(text: string, callback?: () => void): boolean };
 }
 
+/** Decodes bytes in hex text as UTF-8. The host answers in hex too, since its strings end at a NUL. */
+const utf8 = (hex: string) =>
+  __utf8(hex).replace(/..../g, (unit) => String.fromCharCode(parseInt(unit, 16)));
+
 /** The listeners of `process`, by event name. */
 const listeners = new Map<string, Listener[]>();
+const raw = (name: string) => listeners.get(name) ?? [];
 const on = (name: string, f: Listener): Process => {
   listeners.set(name, [...(listeners.get(name) ?? []), f]);
   return proc;
@@ -38,9 +46,19 @@ const on = (name: string, f: Listener): Process => {
 const off = (name: string, f: Listener): Process => {
   listeners.set(
     name,
-    (listeners.get(name) ?? []).filter((x) => x !== f),
+    (listeners.get(name) ?? []).filter((x) => x !== f && (x as Wrapper).listener !== f),
   );
   return proc;
+};
+const once = (name: string, f: Listener): Process => {
+  const wrapper: Wrapper = Object.assign(
+    (...args: unknown[]) => {
+      off(name, wrapper);
+      f(...args);
+    },
+    { listener: f },
+  );
+  return on(name, wrapper);
 };
 /** The `process` of the context. */
 const proc: Process = {
@@ -51,13 +69,14 @@ const proc: Process = {
   cwd: () => "/",
   nextTick: (f) => void Promise.resolve().then(f),
   emitWarning() {},
-  listeners: (name) => [...(listeners.get(name) ?? [])],
+  listeners: (name) => (listeners.get(name) ?? []).map((f) => (f as Wrapper).listener ?? f),
   on,
-  once: on,
+  once,
   off,
   removeListener: off,
-  removeAllListeners() {
-    listeners.clear();
+  removeAllListeners(name) {
+    if (name === undefined) listeners.clear();
+    else listeners.delete(name);
     return proc;
   },
   memoryUsage: () => ({ heapUsed: 0 }),
@@ -79,9 +98,16 @@ Object.assign(globalThis, {
     dispatchEvent() {}
   },
   Event: class {},
+  // no `fatal`, `ignoreBOM` or `stream` options
   TextDecoder: class {
-    decode() {
-      return "";
+    decode(input?: ArrayBuffer | ArrayBufferView): string {
+      if (input === undefined) return "";
+      const bytes = ArrayBuffer.isView(input)
+        ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
+        : new Uint8Array(input);
+      let hex = "";
+      for (const b of bytes) hex += b.toString(16).padStart(2, "0");
+      return utf8(hex).replace(/^\ufeff/, "");
     }
   },
 });
@@ -137,7 +163,7 @@ Object.defineProperty(Error, "prepareStackTrace", {
       try {
         t.cb(...t.args);
       } catch (error) {
-        const handlers = proc.listeners("uncaughtException");
+        const handlers = raw("uncaughtException");
         if (handlers.length === 0) throw error;
         for (const handler of handlers) handler(error);
       }
@@ -151,8 +177,8 @@ class InlineAbortSignal {
   aborted = false;
   reason: unknown;
   handlers: ((e: { type: string }) => void)[] = [];
-  addEventListener(_type: string, f: (e: { type: string }) => void) {
-    this.handlers.push(f);
+  addEventListener(type: string, f: (e: { type: string }) => void) {
+    if (type === "abort") this.handlers.push(f);
   }
   removeEventListener(_type: string, f: unknown) {
     this.handlers = this.handlers.filter((x) => x !== f);
@@ -177,16 +203,31 @@ if (!("AbortController" in globalThis)) {
   Object.assign(globalThis, { AbortController: InlineAbortController });
 }
 
+// an invalid sequence of escapes becomes U+FFFD, and a lone % stays as it is
+const decode = (text: string) =>
+  text.replace(/\+/g, " ").replace(/(?:%[0-9a-f]{2})+/gi, (run) => utf8(run.replaceAll("%", "")));
+
+const encode = (text: string) =>
+  encodeURIComponent(
+    text.replace(
+      /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g,
+      "\ufffd",
+    ),
+  )
+    .replace(/%20/g, "+")
+    .replace(/[!'()~]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+
 /**
  * The `URLSearchParams` of the context, which has none. It parses and writes plain `key=value`
- * pairs.
+ * pairs and reads `+` as a space.
  */
 class InlineSearchParams {
   pairs: [string, string][] = [];
   constructor(query = "") {
     for (const kv of String(query).replace(/^\?/, "").split("&").filter(Boolean)) {
-      const [k = "", v = ""] = kv.split("=");
-      this.pairs.push([decodeURIComponent(k), decodeURIComponent(v)]);
+      const eq = kv.indexOf("=");
+      const [k, v] = eq < 0 ? [kv, ""] : [kv.slice(0, eq), kv.slice(eq + 1)];
+      this.pairs.push([decode(k), decode(v)]);
     }
   }
   get(k: string) {
@@ -202,9 +243,7 @@ class InlineSearchParams {
     this.pairs = this.pairs.filter((e) => e[0] !== k);
   }
   toString() {
-    return this.pairs
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join("&");
+    return this.pairs.map(([k, v]) => `${encode(k)}=${encode(v)}`).join("&");
   }
 }
 
@@ -228,7 +267,11 @@ class InlineURL {
       if (base === undefined) throw new TypeError(`invalid URL. got ${JSON.stringify(text)}`);
       const b = new InlineURL(base);
       return new InlineURL(
-        text.startsWith("/") ? b.origin + text : b.href.replace(/[^/]*$/, "") + text,
+        text.startsWith("//")
+          ? b.protocol + text
+          : text.startsWith("/")
+            ? b.origin + text
+            : b.href.replace(/[^/]*$/, "") + text,
       );
     }
     this.protocol = m[1]!;
@@ -287,7 +330,7 @@ if (!("URL" in globalThis)) Object.assign(globalThis, { URL: InlineURL });
     __flushRejections: () => {
       const reasons = [...rejected.values()];
       rejected.clear();
-      for (const reason of reasons) for (const f of proc.listeners("unhandledRejection")) f(reason);
+      for (const reason of reasons) for (const f of raw("unhandledRejection")) f(reason);
     },
   });
 }

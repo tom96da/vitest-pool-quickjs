@@ -13,6 +13,18 @@ describe("unhandled rejections", () => {
     expect(reported).toHaveLength(1);
   });
 
+  it("reports a rejection that a timer callback creates before the next timer runs", async () => {
+    const reported: unknown[] = [];
+    const listener = (reason: unknown) => reported.push(reason);
+    process.on("unhandledRejection", listener);
+    const seen = await new Promise<number>((resolve) => {
+      setTimeout(() => void Promise.reject(new Error("created in a timer")), 0);
+      setTimeout(() => resolve(reported.length), 0);
+    });
+    process.off("unhandledRejection", listener);
+    expect(seen).toBe(1);
+  });
+
   it("reports the rejection of a then that nothing handles", async () => {
     const reported = await collect("unhandledRejection", () => {
       void Promise.resolve(1).then(() => {

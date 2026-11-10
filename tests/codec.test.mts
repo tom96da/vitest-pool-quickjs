@@ -90,4 +90,21 @@ describe.concurrent("codec", () => {
     const error = Object.assign(new Error("boom"), { code: "E_BOOM" });
     expect((roundTrip(error) as { code: string }).code).toBe("E_BOOM");
   });
+
+  it.each([
+    ["no node list", '{"r":1}'],
+    ["null", "null"],
+    ["a node list that is not an array", '{"n":{}}'],
+  ])("rejects JSON that is %s", (_name, text) => {
+    expect(() => decode(text)).toThrow("not the output of encode");
+  });
+
+  it.each([
+    ["an id with no node", '{"r":{"$":5},"n":[]}'],
+    ["an object without an id", '{"r":{"x":1},"n":[]}'],
+    ["an id that is not a number", '{"r":{"$":"a"},"n":[]}'],
+    ["an id of a null node", '{"r":{"$":0},"n":[null]}'],
+  ])("rejects a reference with %s", (_name, text) => {
+    expect(() => decode(text)).toThrow("has no node");
+  });
 });

@@ -7,7 +7,7 @@ import type { ViteUserConfig } from "vitest/config";
 import type { QuickJSPoolOptions } from "../src/index.mts";
 
 // The types come from the source. The pool comes from the build.
-const { quickjsPool } = (await import(
+export const { quickjsPool } = (await import(
   new URL("../dist/index.js", import.meta.url).href
 )) as typeof import("../src/index.mts");
 

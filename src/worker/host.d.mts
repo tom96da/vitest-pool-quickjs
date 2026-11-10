@@ -5,6 +5,11 @@
 declare global {
   /** Milliseconds since the context started. */
   function __now(): number;
+  /**
+   * Decodes bytes given as hex text (two digits per byte) as UTF-8.
+   * The result is hex text too (four digits per UTF-16 unit).
+   */
+  function __utf8(bytes: string): string;
   /** Sends one encoded message to the pool. */
   function __post(text: string): void;
   /** Writes to the standard output of the process. */

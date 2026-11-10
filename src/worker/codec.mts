@@ -59,9 +59,19 @@ export function encode(root: unknown): string {
  * Decodes the text that `encode` made.
  * @param text - the text from `encode`
  * @returns the value, with the same shared references and cycles
+ * @throws SyntaxError when the text is not JSON
+ * @throws TypeError when the text is not the output of `encode`
  */
 export function decode(text: string): unknown {
-  const { r, n } = JSON.parse(text) as { r: unknown; n: Node[] };
+  const parsed: unknown = JSON.parse(text);
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    !Array.isArray((parsed as { n?: unknown }).n)
+  ) {
+    throw new TypeError("decode: the text is not the output of encode");
+  }
+  const { r, n } = parsed as { r: unknown; n: Node[] };
   const made: unknown[] = [];
   const dec = (v: unknown): unknown => {
     if (v === null || typeof v !== "object") return v;
@@ -69,9 +79,10 @@ export function decode(text: string): unknown {
     if (tag.$u) return undefined;
     if (tag.$b !== undefined) return BigInt(tag.$b);
     if (tag.$n !== undefined) return Number(tag.$n);
-    const id = tag.$!;
+    const id = tag.$;
+    const node = typeof id === "number" ? n[id] : undefined;
+    if (id === undefined || node == null) throw new TypeError("decode: a reference has no node");
     if (id in made) return made[id];
-    const node = n[id]!;
     if (Array.isArray(node)) {
       const out: unknown[] = [];
       made[id] = out;

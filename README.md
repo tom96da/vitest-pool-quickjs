@@ -28,12 +28,13 @@ export default defineConfig({
 
 | Option      | Description                                                                     |
 | ----------- | ------------------------------------------------------------------------------- |
-| `externals` | Specifiers of the packages that a test imports from `node_modules`.             |
+| `externals` | Specifiers of the packages and relative files that a test imports.              |
 | `preludes`  | Paths of scripts that run in the context before the tests, to define globals.   |
 | `modules`   | Source of `node:*` modules by id. It wins over the modules of the pool.         |
 | `plugins`   | Rolldown plugins that apply to the modules that the pool loads into the context. |
 
-A test can import a package from `node_modules` when `externals` lists it, for example:
+A test can import a package from `node_modules` or a relative file such as a CommonJS file when
+`externals` lists it, for example:
 
 ```ts
 quickjsPool({ externals: ["pathe"] });
@@ -48,5 +49,8 @@ quickjsPool({ externals: ["pathe"] });
 ## Limits
 
 - Test files run one after another in a single thread.
-- Each file starts a context and loads a bundle of the worker.
+- The memory of a context stays until the process exits. With `isolate: false` one context holds
+  the modules of every file.
 - The context has the globals of the web and of Node that Vitest reads, and no others.
+- The console does not print `time`, `timeEnd` and `timeLog`.
+- `TextDecoder` is slow on large buffers: 1 MB takes seconds.
