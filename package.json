@@ -1,0 +1,20 @@
+{
+  "name": "vitest-pool-quickjs",
+  "version": "1.0.0",
+  "description": "A Vitest pool that runs test files in QuickJS.",
+  "keywords": [
+    "quickjs",
+    "test",
+    "vitest",
+    "vitest-pool"
+  ],
+  "license": "(MIT OR Apache-2.0)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tom96da/vitest-pool-quickjs.git"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
