@@ -15,5 +15,6 @@
     "noEmit": true,
     "types": ["node"],
     "erasableSyntaxOnly": true
-  }
+  },
+  "include": ["src/**/*"]
 }

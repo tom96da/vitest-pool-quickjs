@@ -20,12 +20,24 @@
     "format": "oxfmt --check .",
     "typecheck": "tsc -b --noEmit"
   },
+  "dependencies": {
+    "@jitl/quickjs-ng-wasmfile-release-sync": "^0.32.0",
+    "pathe": "^2.0.3",
+    "quickjs-emscripten": "^0.32.0",
+    "rolldown": "~1.2.15"
+  },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "@typescript/native": "npm:typescript@7.1.0-beta",
     "oxfmt": "^0.77.0",
     "oxlint": "^1.92.0",
     "oxlint-tsgolint": "^7.0.2006",
-    "typescript": "npm:@typescript/typescript6@^6.0.2"
+    "ts-dedent": "^2.3.0",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vitest": "^5.0.3"
+  },
+  "peerDependencies": {
+    "vitest": "^5.0.3"
   },
   "devEngines": {
     "packageManager": {
