@@ -16,5 +16,5 @@
     "types": ["node"],
     "erasableSyntaxOnly": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "tests/**/*", "*.mts"]
 }

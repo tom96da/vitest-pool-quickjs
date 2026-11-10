@@ -15,7 +15,8 @@
   },
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "pretest": "pnpm build",
+    "test": "vitest run",
     "lint": "oxlint --type-aware",
     "format": "oxfmt --check .",
     "typecheck": "tsc -b --noEmit"
