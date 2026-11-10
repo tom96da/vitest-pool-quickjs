@@ -256,17 +256,21 @@ if (!("URLSearchParams" in globalThis)) {
 if (!("URL" in globalThis)) Object.assign(globalThis, { URL: InlineURL });
 
 // QuickJS reports no unhandled rejection to JS, so promises are watched through then and reject.
-// A promise that a test awaits does not pass through then, so its rejection counts as unhandled
-// even when the test catches it. The rejection of an async function nobody awaits is not seen.
+// `await` skips then for a promise whose constructor is Promise. A watched promise has a
+// constructor of its own, so that `await` calls then and marks the promise as handled. The
+// rejection of an async function nobody awaits is not seen.
 {
   const handled = new WeakSet<object>();
   const rejected = new Map<object, unknown>();
   const nativeThen = Reflect.get(Promise.prototype, "then") as Promise<unknown>["then"];
   const nativeReject = Reflect.get(Promise, "reject") as (reason: unknown) => Promise<unknown>;
-  const watch = (promise: Promise<unknown>) =>
+  const awaitable = function WatchedPromise() {};
+  const watch = (promise: Promise<unknown>) => {
+    void Object.defineProperty(promise, "constructor", { value: awaitable, configurable: true });
     void nativeThen.call(promise, undefined, (reason: unknown) => {
       if (!handled.has(promise)) rejected.set(promise, reason);
     });
+  };
   Reflect.set(Promise.prototype, "then", function (this: Promise<unknown>, ok: never, bad: never) {
     handled.add(this);
     rejected.delete(this);
