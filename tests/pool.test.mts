@@ -81,9 +81,74 @@ describe.concurrent("a failing run", () => {
   });
 });
 
+describe.concurrent("an import that externals does not list", () => {
+  it("names the unlisted file and the externals option in its error", async () => {
+    const { code, stdout, stderr } = await runFixture("fixture-missing-external");
+    expect(code).toBe(1);
+    const output = stdout + stderr;
+    expect(output).toContain("fixture-missing-external/lib/unlisted.cjs");
+    expect(output).toContain("list it in the externals option of quickjsPool");
+  });
+});
+
+describe.concurrent("console of the context", () => {
+  let report: Report;
+  beforeAll(async () => {
+    report = await runFixture("fixture-console");
+  });
+
+  it.each(["a-log", "a-info", "a-debug", "a-table", "{ dir: 1 }"])(
+    "writes %s to stdout",
+    (line) => {
+      expect(report.stdout).toContain(`${line}\n`);
+    },
+  );
+
+  it.each(["a-warn", "an-error", "Trace: a-trace", "Assertion failed a-failing-assert"])(
+    "writes %s to stderr",
+    (line) => {
+      expect(report.stderr).toContain(`${line}\n`);
+    },
+  );
+
+  it("writes nothing for a passing assert", () => {
+    expect(report.stderr + report.stdout).not.toContain("a-passing-assert");
+  });
+
+  it("counts by label", () => {
+    expect(report.stdout).toContain("default: 1\ndefault: 2\nlabel: 1\n");
+  });
+
+  it("restarts a label after countReset", () => {
+    expect(report.stdout).toContain("label: 1\ndefault: 1\n");
+  });
+
+  it("indents the lines of a group", () => {
+    expect(report.stdout).toContain("outer\n  in-outer\n    in-inner\n");
+  });
+
+  it("ends the indent at groupEnd", () => {
+    expect(report.stdout).toContain("in-inner\nafter-groups\n");
+  });
+
+  it("indents every line of a multi-line message in a group", () => {
+    expect(report.stdout).toContain("g\n  multi\n  indented\n");
+  });
+
+  it("writes an empty line for a call without arguments", () => {
+    expect(report.stdout).toContain("after-groups\n\nmulti\nline\n");
+  });
+
+  it("prints nothing for time, timeEnd and timeLog", () => {
+    expect(report.stdout + report.stderr).not.toContain("timer-label");
+  });
+});
+
 describe.concurrent("projects that pass", () => {
   it.each([
-    ["fixture-node-modules", "Tests  4 passed (4)"],
+    ["fixture-globals", "Tests  50 passed (50)"],
+    ["fixture-node-modules", "Tests  10 passed (10)"],
+    ["fixture-options", "Tests  7 passed (7)"],
     ["fixture-prelude", "Tests  1 passed (1)"],
     ["fixture-process", "Tests  6 passed (6)"],
     ["fixture-rejections", "Tests  7 passed (7)"],

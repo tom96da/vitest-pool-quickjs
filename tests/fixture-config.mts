@@ -4,12 +4,13 @@
 import { defineConfig } from "vitest/config";
 import type { ViteUserConfig } from "vitest/config";
 
+import pkg from "../package.json" with { type: "json" };
 import type { QuickJSPoolOptions } from "../src/index.mts";
 
+const build = new URL(pkg.exports["."].import, new URL("../package.json", import.meta.url)).href;
+
 // The types come from the source. The pool comes from the build.
-export const { quickjsPool } = (await import(
-  new URL("../dist/index.js", import.meta.url).href
-)) as typeof import("../src/index.mts");
+export const { quickjsPool } = (await import(build)) as typeof import("../src/index.mts");
 
 /**
  * Makes the config of a fixture project.
