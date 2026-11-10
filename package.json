@@ -15,6 +15,24 @@
   },
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  }
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "oxlint --type-aware",
+    "format": "oxfmt --check .",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "devDependencies": {
+    "@typescript/native": "npm:typescript@7.1.0-beta",
+    "oxfmt": "^0.77.0",
+    "oxlint": "^1.92.0",
+    "oxlint-tsgolint": "^7.0.2006",
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.18.0",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.18.0"
 }
