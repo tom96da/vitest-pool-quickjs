@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- parallel runs of the test files are available, as many at a time as `maxWorkers` allows ([39b0c35](https://github.com/tom96da/vitest-pool-quickjs/commit/39b0c35))
+
 ## [0.1.1] - 2026-11-12
 
 ### Fixed
