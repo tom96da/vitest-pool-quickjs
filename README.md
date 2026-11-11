@@ -1,5 +1,13 @@
 # vitest-pool-quickjs
 
+<!-- badges:start -->
+[![npm version](https://img.shields.io/npm/v/vitest-pool-quickjs)](https://npmjs.com/package/vitest-pool-quickjs)
+[![node version](https://img.shields.io/node/v/vitest-pool-quickjs)](https://nodejs.org/)
+[![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#scroll-license)
+[![CI](https://github.com/tom96da/vitest-pool-quickjs/actions/workflows/ci.yml/badge.svg)](https://github.com/tom96da/vitest-pool-quickjs/actions/workflows/ci.yml)
+<!-- badges:end -->
+
+
 A [Vitest](https://vitest.dev/) pool that runs test files in [QuickJS](https://bellard.org/quickjs/).
 
 ## How it works
@@ -7,6 +15,8 @@ A [Vitest](https://vitest.dev/) pool that runs test files in [QuickJS](https://b
 The worker of Vitest runs in a QuickJS context without changes. The pool gives it the globals and
 Node modules that QuickJS lacks, so `describe`, `expect`, `vi.mock`, fake timers and the reporters
 are the ones of Vitest.
+
+Powered by [quickjs-wasi](https://github.com/vercel-labs/quickjs-wasi).
 
 ## Usage
 
@@ -48,7 +58,6 @@ quickjsPool({ externals: ["pathe"] });
 
 ## Limits
 
-- Each test file runs in its own thread, as many at a time as `maxWorkers` allows.
 - With `isolate: false` one context holds the modules of every file.
 - A context has 1 GiB of memory.
 - Recursion deeper than about 1600 frames of a small function throws a `RangeError`.
