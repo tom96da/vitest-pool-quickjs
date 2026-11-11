@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- let a test import a relative file such as a CommonJS file through `externals` ([3283a52](https://github.com/tom96da/vitest-pool-quickjs/commit/3283a52))
+- decode UTF-8 in `TextDecoder` ([3283a52](https://github.com/tom96da/vitest-pool-quickjs/commit/3283a52))
+- make `URL`, `URLSearchParams`, `AbortController` and `process` events behave as on the web ([3283a52](https://github.com/tom96da/vitest-pool-quickjs/commit/3283a52))
+
 ## [0.1.0] - 2026-11-11
 
 ### Features
