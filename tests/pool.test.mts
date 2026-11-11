@@ -146,7 +146,7 @@ describe.concurrent("console of the context", () => {
 
 describe.concurrent("projects that pass", () => {
   it.each([
-    ["fixture-globals", "Tests  50 passed (50)"],
+    ["fixture-globals", "Tests  51 passed (51)"],
     ["fixture-node-modules", "Tests  10 passed (10)"],
     ["fixture-options", "Tests  7 passed (7)"],
     ["fixture-prelude", "Tests  1 passed (1)"],

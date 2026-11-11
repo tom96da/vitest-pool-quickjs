@@ -234,3 +234,27 @@ describe("AbortController", () => {
     expect(() => controller.signal.throwIfAborted()).toThrow("stop");
   });
 });
+
+describe("FinalizationRegistry", () => {
+  /** Builds a registry and a target that both become garbage in one cycle. */
+  const drop = () => {
+    const registry = new FinalizationRegistry(() => {});
+    const target: { self?: object } = {};
+    target.self = target;
+    registry.register(target, 1);
+    const holder: { registry: object; self?: object } = { registry };
+    holder.self = holder;
+  };
+
+  it("survives a registry that is collected with its target", async () => {
+    drop();
+    drop();
+    // allocating cycles runs the cycle collector
+    for (let i = 0; i < 100_000; i++) {
+      const a: { self?: object } = {};
+      a.self = a;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(new FinalizationRegistry(() => {})).toBeInstanceOf(FinalizationRegistry);
+  });
+});
