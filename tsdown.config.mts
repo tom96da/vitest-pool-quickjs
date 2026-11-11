@@ -33,9 +33,9 @@ export default defineConfig([
   {
     // The worker runs in QuickJS. The pool bundles it again with the vitest of the user.
     entry: {
-      worker: "src/worker/worker.mts",
+      worker: "src/worker.mts",
       prelude: "src/worker/prelude.mts",
-      "shims/*": "src/worker/shims/*.mts",
+      "shims/*": "src/shims/*.mts",
     },
     deps: {
       neverBundle: ["virtual:externals", /^vitest(\/|$)/],

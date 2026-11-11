@@ -3,12 +3,12 @@
 
 // The vitest worker that runs inside the QuickJS context.
 
-import "./prelude.mts";
+import "./worker/prelude.mts";
 import externals from "virtual:externals";
 import * as vitest from "vitest";
 import { init, runBaseTests, setupEnvironment } from "vitest/worker";
 
-import { decode, encode } from "./codec.mts";
+import { decode, encode } from "./worker/codec.mts";
 
 const handlers = new Set<(message: unknown) => unknown>();
 
