@@ -8,6 +8,7 @@ import type { Worker } from "node:worker_threads";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkerRequest } from "vitest/node";
 
+import { encode } from "../src/worker/codec.mts";
 import { quickjsPool } from "./fixture-config.mts";
 
 const root = path.resolve(import.meta.dirname, "fixture-filter");
@@ -141,5 +142,34 @@ describe("stop", () => {
     const { worker } = await started();
     await worker.stop();
     await expect(worker.stop()).resolves.toBeUndefined();
+  });
+});
+
+describe("the reports of a stopped thread", () => {
+  it.each([
+    { kind: "stdout", value: "late" },
+    { kind: "stderr", value: "late" },
+    { kind: "message", value: encode({ type: "late" }) },
+    { kind: "error", value: new Error("late") },
+  ])("reach nothing outside for the $kind report", async (report) => {
+    const { worker, errors } = await started();
+    const thread = (worker as unknown as { thread: Worker }).thread;
+    const messages: unknown[] = [];
+    worker.on("message", (message: unknown) => messages.push(message));
+    const stdout = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      // the thread drops its listeners when it exits, so the report comes while it ends
+      const stopping = worker.stop();
+      thread.emit("message", report);
+      await stopping;
+      expect(stdout).not.toHaveBeenCalled();
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      stdout.mockRestore();
+      stderr.mockRestore();
+    }
+    expect(messages).toEqual([]);
+    expect(errors).toEqual([]);
   });
 });
