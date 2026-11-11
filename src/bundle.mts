@@ -11,26 +11,31 @@ import dedent from "ts-dedent";
 
 import type { QuickJSPoolOptions } from "./types.mts";
 
+/** The extension of the modules next to this file: `.mts` in the sources, `.js` in the build. */
+const ext = import.meta.url.endsWith(".mts") ? ".mts" : ".js";
+
 /**
- * Resolves a path against the directory of the built package.
- * @param relative - a path relative to this file
- * @returns the absolute file path
+ * Locates a module of the package by its name in the source tree. The build lays the modules out
+ * the same way.
+ * @param name - the name without the extension, such as `worker` or `shims/path`
+ * @returns the URL of the module
  */
-const here = (relative: string): string => fileURLToPath(new URL(relative, import.meta.url));
-
-/** The built entry of the worker. */
-const workerEntry = (): string => here("./worker.js");
+export const asset = (name: string): URL => new URL(`./${name}${ext}`, import.meta.url);
 
 /**
- * Locates the built module that replaces a `node:*` module.
+ * Locates the module that replaces a `node:*` module.
  * @param name - the module name without the `node:` prefix
  * @returns the absolute file path
  */
-const shim = (name: string): string => here(`./shims/${name}.js`);
+const shim = (name: string): string => fileURLToPath(asset(`shims/${name}`));
 
 /** The names of the built-ins that the package replaces with a module of its own. */
 const shimNames = async (): Promise<Set<string>> =>
-  new Set((await readdir(here("./shims"))).map((file) => file.replace(/\.js$/, "")));
+  new Set(
+    (await readdir(new URL("./shims", import.meta.url)))
+      .filter((file) => file.endsWith(ext))
+      .map((file) => file.slice(0, -ext.length)),
+  );
 
 /**
  * Writes the source of a built-in that the package has no module for. The module has the export
@@ -151,7 +156,7 @@ export async function buildWorker(
 ): Promise<string> {
   const shims = await shimNames();
   const build = await rolldown({
-    input: workerEntry(),
+    input: fileURLToPath(asset("worker")),
     platform: "neutral",
     resolve: { conditionNames: ["import", "default"], mainFields: ["module", "main"] },
     checks: { bundlerTimings: false },

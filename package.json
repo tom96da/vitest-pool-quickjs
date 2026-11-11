@@ -36,7 +36,6 @@
   },
   "scripts": {
     "build": "tsdown",
-    "pretest": "pnpm build",
     "test": "vitest run",
     "lint": "oxlint --type-aware",
     "format": "oxfmt --check .",

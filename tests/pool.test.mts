@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 import { execFile } from "node:child_process";
-import { access } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -27,7 +26,7 @@ const timeOf = (stdout: string) => (label: string) =>
   Number(new RegExp(`${label} (\\d+)`).exec(stdout)?.[1]);
 
 /**
- * Runs a fixture project with the built pool.
+ * Runs a fixture project with the pool.
  * @param name - the directory of the project under `tests/`
  * @param extra - more arguments for `vitest run`
  * @returns the exit code and the two output streams
@@ -44,13 +43,6 @@ async function runFixture(name: string, extra: string[] = []): Promise<Report> {
     return { code: e.code, stdout: e.stdout, stderr: e.stderr };
   }
 }
-
-// the fixture projects load the pool from dist, which `pnpm test` builds first
-beforeAll(async () => {
-  await access(path.join(root, "dist/index.js")).catch(() => {
-    throw new Error("dist/ is missing: run `pnpm build` first, or run the tests with `pnpm test`");
-  });
-});
 
 // each describe below is one run of a fixture project, and a project is never run twice at once
 describe.concurrent("a failing run", () => {

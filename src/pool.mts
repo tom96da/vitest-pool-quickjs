@@ -8,12 +8,12 @@ import { Worker } from "node:worker_threads";
 
 import type { PoolOptions, PoolRunnerInitializer, PoolWorker, WorkerRequest } from "vitest/node";
 
-import { buildWorker } from "./bundle.mts";
+import { asset, buildWorker } from "./bundle.mts";
 import type { Prepared, QuickJSPoolOptions, Report } from "./types.mts";
 import { decode, encode } from "./worker/codec.mts";
 
-/** The thread that hosts one context; the build puts it next to this file. */
-const threadUrl = new URL("./thread.js", import.meta.url);
+/** The thread that hosts one context. */
+const threadUrl = asset("thread");
 
 class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
   readonly name = "quickjs";
