@@ -33,8 +33,8 @@ export default defineConfig({
 | `modules`   | Source of `node:*` modules by id. It wins over the modules of the pool.         |
 | `plugins`   | Rolldown plugins that apply to the modules that the pool loads into the context. |
 
-A test can import a package from `node_modules` or a relative file such as a CommonJS file when
-`externals` lists it, for example:
+A test can import a package from `node_modules` or a relative file when `externals` lists it, for
+example:
 
 ```ts
 quickjsPool({ externals: ["pathe"] });

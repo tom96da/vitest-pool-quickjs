@@ -8,35 +8,11 @@ import path from "node:path";
 import variant from "@jitl/quickjs-ng-wasmfile-release-sync";
 import { newQuickJSWASMModule } from "quickjs-emscripten";
 import type { QuickJSContext, QuickJSHandle, QuickJSRuntime } from "quickjs-emscripten";
-import type { Plugin } from "rolldown";
 import type { PoolOptions, PoolRunnerInitializer, PoolWorker, WorkerRequest } from "vitest/node";
 
 import { buildWorker } from "./bundle.mts";
+import type { Prepared, QuickJSPoolOptions } from "./types.mts";
 import { decode, encode } from "./worker/codec.mts";
-
-/** Options of `quickjsPool()`. */
-export interface QuickJSPoolOptions {
-  /**
-   * Modules that a test imports and that Vitest does not inline, such as a CommonJS file. A test
-   * can import each listed specifier, for example `"@vue/runtime-core/dist/runtime-core.cjs.js"`.
-   */
-  externals?: string[];
-  /**
-   * Paths of scripts to run in the context before the tests, for example to define globals. A
-   * relative path starts at the root of the project.
-   */
-  preludes?: string[];
-  /** Source of `node:*` modules by id. It wins over the modules that the pool provides. */
-  modules?: Record<string, string>;
-  /** Rolldown plugins that apply to the modules the pool loads into the context. */
-  plugins?: Plugin[];
-}
-
-/** What a pool worker loads into a new context: the bundled worker and the scripts before it. */
-interface Prepared {
-  worker: string;
-  preludes: { name: string; code: string }[];
-}
 
 /** The memory limit of one context. */
 const memoryLimit = 1024 * 1024 * 1024;
@@ -242,15 +218,7 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
   const builds = new Map<string, Promise<string>>();
   const prepared = async (root: string): Promise<Prepared> => {
     if (!builds.has(root)) {
-      builds.set(
-        root,
-        buildWorker({
-          root,
-          externals: options.externals ?? [],
-          modules: options.modules ?? {},
-          plugins: options.plugins ?? [],
-        }),
-      );
+      builds.set(root, buildWorker(root, options));
     }
     return {
       worker: await builds.get(root)!,

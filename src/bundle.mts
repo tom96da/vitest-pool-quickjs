@@ -9,17 +9,7 @@ import { rolldown } from "rolldown";
 import type { Plugin, PluginContext } from "rolldown";
 import dedent from "ts-dedent";
 
-/** What the worker bundle is built from. */
-export interface BuildOptions {
-  /** Directory that the `externals` resolve from. */
-  root: string;
-  /** Specifiers of the modules that the worker can import beyond the ones vitest inlines. */
-  externals: string[];
-  /** Source of `node:*` modules by id. It wins over the modules that the pool provides. */
-  modules: Record<string, string>;
-  /** Rolldown plugins that run after the plugins of the pool. */
-  plugins: Plugin[];
-}
+import type { QuickJSPoolOptions } from "./types.mts";
 
 /**
  * Resolves a path against the directory of the built package.
@@ -146,10 +136,19 @@ const externalImport: Plugin = {
 
 /**
  * Bundles the worker into one script for a QuickJS context.
- * @param options - the modules, scripts and plugins of the build
+ * @param root - the directory that the `externals` resolve from
+ * @param options - the externals, modules and plugins of the build; plugins run after the plugins
+ * of the pool
  * @returns the source of the script
  */
-export async function buildWorker(options: BuildOptions): Promise<string> {
+export async function buildWorker(
+  root: string,
+  {
+    externals = [],
+    modules = {},
+    plugins = [],
+  }: Pick<QuickJSPoolOptions, "externals" | "modules" | "plugins">,
+): Promise<string> {
   const shims = await shimNames();
   const build = await rolldown({
     input: workerEntry(),
@@ -159,10 +158,10 @@ export async function buildWorker(options: BuildOptions): Promise<string> {
     // the optional environments of vitest (jsdom, happy-dom) are not installed and not used
     onLog() {},
     plugins: [
-      externalModules(options.externals, options.root),
-      nodeModules(options.modules, shims),
+      externalModules(externals, root),
+      nodeModules(modules, shims),
       externalImport,
-      ...options.plugins,
+      ...plugins,
     ],
   });
   const { output } = await build.generate({ format: "iife", codeSplitting: false });
