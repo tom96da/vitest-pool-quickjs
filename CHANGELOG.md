@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- run the context on quickjs-wasi, which embeds a newer QuickJS ([6e4ec8a](https://github.com/tom96da/vitest-pool-quickjs/commit/6e4ec8a))
+- decode large inputs with `TextDecoder` quickly ([7263a63](https://github.com/tom96da/vitest-pool-quickjs/commit/7263a63))
+
+### Fixed
+
+- keep the worker alive when `vi.resetModules()` drops a `FinalizationRegistry` ([6e4ec8a](https://github.com/tom96da/vitest-pool-quickjs/commit/6e4ec8a))
+- throw a `RangeError` that the code can catch on deep recursion ([6e4ec8a](https://github.com/tom96da/vitest-pool-quickjs/commit/6e4ec8a))
+
 ## [0.1.2] - 2026-11-12
 
 ### Added
