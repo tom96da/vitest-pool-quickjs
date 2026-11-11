@@ -8,12 +8,7 @@ export default defineConfig([
     entry: { index: "src/index.mts" },
     deps: {
       onlyBundle: ["ts-dedent"],
-      onlyImport: [
-        "@jitl/quickjs-ng-wasmfile-release-sync",
-        "quickjs-emscripten",
-        "rolldown",
-        "vitest",
-      ],
+      onlyImport: ["rolldown", "vitest"],
     },
     format: "esm",
     fixedExtension: false,
@@ -24,6 +19,16 @@ export default defineConfig([
     },
     publint: true,
     attw: { level: "error" },
+  },
+  {
+    entry: { thread: "src/thread.mts" },
+    deps: {
+      onlyImport: ["@jitl/quickjs-ng-wasmfile-release-sync", "quickjs-emscripten"],
+    },
+    format: "esm",
+    fixedExtension: false,
+    outputOptions: { comments: false },
+    dts: false,
   },
   {
     // The worker runs in QuickJS. The pool bundles it again with the vitest of the user.

@@ -48,9 +48,8 @@ quickjsPool({ externals: ["pathe"] });
 
 ## Limits
 
-- Test files run one after another in a single thread.
-- The memory of a context stays until the process exits. With `isolate: false` one context holds
-  the modules of every file.
+- Each test file runs in its own thread, as many at a time as `maxWorkers` allows.
+- With `isolate: false` one context holds the modules of every file.
 - The context has the globals of the web and of Node that Vitest reads, and no others.
 - The console does not print `time`, `timeEnd` and `timeLog`.
 - `TextDecoder` is slow on large buffers: 1 MB takes seconds.

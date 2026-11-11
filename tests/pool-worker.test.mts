@@ -1,9 +1,11 @@
 // Copyright (c) 2026 tom96da
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+import type { EventEmitter } from "node:events";
 import path from "node:path";
+import type { Worker } from "node:worker_threads";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { WorkerRequest } from "vitest/node";
 
 import { quickjsPool } from "./fixture-config.mts";
@@ -37,13 +39,6 @@ describe("the error event of a worker", () => {
     await worker.stop();
   });
 
-  it("is not emitted for a message that is sent", async () => {
-    const { worker, errors } = await started();
-    worker.send({ type: "stop" } as WorkerRequest);
-    expect(errors).toEqual([]);
-    await worker.stop();
-  });
-
   it("ignores a message sent after stop", async () => {
     const { worker, errors } = await started();
     await worker.stop();
@@ -66,6 +61,7 @@ describe("the error event of a pump", () => {
     worker.on("error", (error: unknown) => errors.push(error));
     await worker.start();
     worker.send({ type: "stop" } as WorkerRequest);
+    await vi.waitFor(() => expect(errors).toHaveLength(1));
     expect(errors).toMatchObject([{ message: expect.stringContaining("delay failed") }]);
     await worker.stop();
   });
@@ -81,5 +77,69 @@ describe("a worker whose start throws", () => {
     await expect(worker.start()).rejects.toThrow("prelude failed");
     worker.send({ type: "stop" } as WorkerRequest);
     expect(errors).toEqual([]);
+  });
+});
+
+describe("a worker that ends", () => {
+  const make = () =>
+    quickjsPool().createPoolWorker({
+      project: { config: { root, fsModuleCache: false } },
+    } as never) as unknown as EventEmitter & {
+      thread?: Worker;
+      start(): Promise<void>;
+      stop(): Promise<void>;
+    };
+
+  it("rejects a start that is stopped while the thread boots", async () => {
+    const worker = make();
+    const start = worker.start().catch((error: unknown) => error);
+    await vi.waitFor(() => expect(worker.thread).toBeDefined());
+    await worker.stop();
+    expect(await start).toMatchObject({
+      message: "the thread of the worker ended before it was ready",
+    });
+  });
+
+  it("rejects a start that is stopped while it prepares", async () => {
+    const worker = make();
+    const start = worker.start().catch((error: unknown) => error);
+    await worker.stop();
+    expect(await start).toMatchObject({ message: expect.stringContaining("stopped before it") });
+    expect(worker.thread).toBeUndefined();
+  });
+
+  it("emits an error when the thread exits without a stop", async () => {
+    const worker = make();
+    const errors: unknown[] = [];
+    worker.on("error", (error: unknown) => errors.push(error));
+    await worker.start();
+    void worker.thread!.terminate();
+    await vi.waitFor(() => expect(errors).toHaveLength(1));
+    expect(errors).toMatchObject([{ message: "the thread of the worker ended" }]);
+    await worker.stop();
+  });
+
+  it("emits no error for a stop", async () => {
+    const worker = make();
+    const errors: unknown[] = [];
+    worker.on("error", (error: unknown) => errors.push(error));
+    await worker.start();
+    await worker.stop();
+    expect(errors).toEqual([]);
+  });
+});
+
+describe("stop", () => {
+  it("is safe on a worker that was never started", async () => {
+    const worker = quickjsPool().createPoolWorker({
+      project: { config: { root, fsModuleCache: false } },
+    } as never);
+    await expect(worker.stop()).resolves.toBeUndefined();
+  });
+
+  it("is safe to call twice", async () => {
+    const { worker } = await started();
+    await worker.stop();
+    await expect(worker.stop()).resolves.toBeUndefined();
   });
 });

@@ -26,3 +26,12 @@ export interface Prepared {
   worker: string;
   preludes: { name: string; code: string }[];
 }
+
+/** What a pool thread reports to the main thread. */
+export type Report =
+  | { kind: "ready" }
+  | { kind: "failed"; value: unknown }
+  | { kind: "error"; value: unknown }
+  | { kind: "message"; value: string }
+  | { kind: "stdout"; value: string }
+  | { kind: "stderr"; value: string };

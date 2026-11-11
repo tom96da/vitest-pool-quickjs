@@ -19,6 +19,14 @@ interface Report {
 }
 
 /**
+ * Reads the timestamp that a fixture printed after a label.
+ * @param stdout - the output of the run
+ * @returns a function from a label to its timestamp
+ */
+const timeOf = (stdout: string) => (label: string) =>
+  Number(new RegExp(`${label} (\\d+)`).exec(stdout)?.[1]);
+
+/**
  * Runs a fixture project with the built pool.
  * @param name - the directory of the project under `tests/`
  * @param extra - more arguments for `vitest run`
@@ -179,5 +187,23 @@ describe("fixture-filter", () => {
     const { code, stdout, stderr } = await runFixture("fixture-filter", ["--fsModuleCache"]);
     expect(code).toBe(1);
     expect(stdout + stderr).toContain("set `fsModuleCache: false` in the test options");
+  });
+});
+
+describe("two test files", () => {
+  it("run at the same time", async () => {
+    const { code, stdout } = await runFixture("fixture-parallel");
+    expect(code).toBe(0);
+    const at = timeOf(stdout);
+    expect(at("start-a")).toBeLessThan(at("end-b"));
+    expect(at("start-b")).toBeLessThan(at("end-a"));
+  });
+
+  it("run one after another with one worker", async () => {
+    const { code, stdout } = await runFixture("fixture-parallel", ["--maxWorkers=1"]);
+    expect(code).toBe(0);
+    const at = timeOf(stdout);
+    const [first, second] = at("end-a") < at("end-b") ? ["a", "b"] : ["b", "a"];
+    expect(at(`end-${first}`)).toBeLessThanOrEqual(at(`start-${second}`));
   });
 });

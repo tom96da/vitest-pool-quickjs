@@ -4,40 +4,21 @@
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { Worker } from "node:worker_threads";
 
-import variant from "@jitl/quickjs-ng-wasmfile-release-sync";
-import { newQuickJSWASMModule } from "quickjs-emscripten";
-import type { QuickJSContext, QuickJSHandle, QuickJSRuntime } from "quickjs-emscripten";
 import type { PoolOptions, PoolRunnerInitializer, PoolWorker, WorkerRequest } from "vitest/node";
 
 import { buildWorker } from "./bundle.mts";
-import type { Prepared, QuickJSPoolOptions } from "./types.mts";
+import type { Prepared, QuickJSPoolOptions, Report } from "./types.mts";
 import { decode, encode } from "./worker/codec.mts";
 
-/** The memory limit of one context. */
-const memoryLimit = 1024 * 1024 * 1024;
-
-/** The WebAssembly build of QuickJS. Every context of the process comes from this module. */
-const wasm = newQuickJSWASMModule(variant);
-
-/**
- * Formats a value that a QuickJS call threw.
- * @param error - the dumped value, an error object or any other thrown value
- * @returns the name, message and stack of an error, or the JSON of another value
- */
-function describe(error: unknown): string {
-  if (typeof error === "object" && error !== null) {
-    const e = error as { name?: string; message?: string; stack?: string };
-    return `${e.name}: ${e.message}${e.stack ? `\n${e.stack}` : ""}`;
-  }
-  return `thrown: ${JSON.stringify(error)}`;
-}
+/** The thread that hosts one context; the build puts it next to this file. */
+const threadUrl = new URL("./thread.js", import.meta.url);
 
 class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
   readonly name = "quickjs";
-  private runtime?: QuickJSRuntime;
-  private vm?: QuickJSContext;
-  private timer?: NodeJS.Timeout;
+  private thread?: Worker;
+  private stopped = false;
 
   private prepare: () => Promise<Prepared>;
   constructor(prepare: () => Promise<Prepared>) {
@@ -50,159 +31,60 @@ class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
   }
 
   async start(): Promise<void> {
-    if (this.vm) return;
-    const { worker, preludes } = await this.prepare();
-    const start = performance.now();
-    this.runtime = (await wasm).newRuntime();
-    try {
-      this.runtime.setMemoryLimit(memoryLimit);
-      const vm = (this.vm = this.runtime.newContext());
-      this.define("__stdout", (text) => void process.stdout.write(text));
-      this.define("__stderr", (text) => void process.stderr.write(text));
-      this.define("__utf8", (bytes) =>
-        Buffer.from(bytes, "hex")
-          .toString("utf8")
-          .split("")
-          .map((c) => c.charCodeAt(0).toString(16).padStart(4, "0"))
-          .join(""),
-      );
-      this.define("__post", (text) => queueMicrotask(() => this.emit("message", decode(text))));
-      this.define("__evalFile", (code, filename) => {
-        const result = vm.evalCode(code, filename);
-        if (result.error) {
-          const error = vm.dump(result.error);
-          result.error.dispose();
-          throw new Error(describe(error));
-        }
-        vm.setProp(vm.global, "__evalResult", result.value);
-        result.value.dispose();
+    if (this.thread) return;
+    const prepared = await this.prepare();
+    if (this.stopped) throw new Error("the worker was stopped before it started");
+    const thread = (this.thread = new Worker(threadUrl, { workerData: prepared }));
+    let started = false;
+    await new Promise<void>((resolve, reject) => {
+      const fail = (error: unknown) => {
+        // a failed start leaves the worker inert, so that a later send() does nothing
+        this.thread = undefined;
+        void thread.terminate();
+        reject(error);
+      };
+      thread.on("message", (report: Report) => {
+        if (started && this.thread !== thread) return;
+        if (report.kind === "ready") {
+          started = true;
+          resolve();
+        } else if (report.kind === "failed") fail(report.value);
+        else if (report.kind === "message") this.emit("message", decode(report.value));
+        else if (report.kind === "stdout") process.stdout.write(report.value);
+        else if (report.kind === "stderr") process.stderr.write(report.value);
+        else if (report.kind === "error") this.emit("error", report.value);
+        else report satisfies never;
       });
-      const now = vm.newFunction("__now", () => vm.newNumber(performance.now() - start));
-      vm.setProp(vm.global, "__now", now);
-      now.dispose();
-      for (const prelude of preludes) this.run(prelude.code, prelude.name);
-      this.run(worker, "worker.js");
-    } catch (error) {
-      // clears vm and runtime so that a later send() does nothing
-      this.vm = undefined;
-      this.runtime = undefined;
-      throw error;
-    }
+      thread.on("error", (error) => {
+        if (started && this.thread === thread) this.emit("error", error);
+        fail(error);
+      });
+      thread.on("exit", () => {
+        if (!started) fail(new Error("the thread of the worker ended before it was ready"));
+        else if (this.thread === thread) {
+          this.thread = undefined;
+          this.emit("error", new Error("the thread of the worker ended"));
+        }
+      });
+    });
   }
 
   send(message: WorkerRequest): void {
-    if (!this.vm) return;
+    if (!this.thread) return;
     try {
-      this.call("__onMessage", encode(message));
+      this.thread.postMessage(encode(message));
     } catch (error) {
       this.emit("error", error);
     }
-    this.pump();
   }
 
   async stop(): Promise<void> {
-    clearTimeout(this.timer);
-    // no dispose: the engine asserts at disposal after a collected cycle that held a weak
-    // reference, and the abort ends the whole wasm module. The memory stays until the process
-    // exits.
-    this.vm = undefined;
-    this.runtime = undefined;
-  }
-
-  /**
-   * Defines a global function of string arguments in the context.
-   * @param name - the name of the global
-   * @param fn - the host function the global calls; a string it returns is the result
-   */
-  private define(name: string, fn: (...args: string[]) => string | void): void {
-    const vm = this.vm!;
-    const handle = vm.newFunction(name, (...args: QuickJSHandle[]) => {
-      const result = fn(...args.map((a) => vm.getString(a)));
-      return typeof result === "string" ? vm.newString(result) : undefined;
-    });
-    vm.setProp(vm.global, name, handle);
-    handle.dispose();
-  }
-
-  /**
-   * Runs a script in the context.
-   * @param code - the source of the script
-   * @param name - the file name that stack traces show
-   */
-  private run(code: string, name: string): void {
-    const result = this.vm!.evalCode(code, name);
-    if (result.error) {
-      const error = this.vm!.dump(result.error);
-      result.error.dispose();
-      throw new Error(describe(error));
-    }
-    result.value.dispose();
-  }
-
-  /**
-   * Calls a global function of the context with string arguments.
-   * @param name - the name of the global function
-   * @param args - the arguments, passed as strings
-   * @returns the result when it is a number or a string, otherwise `undefined`
-   */
-  private call(name: string, ...args: string[]): number | string | undefined {
-    const vm = this.vm!;
-    const fn = vm.getProp(vm.global, name);
-    const handles = args.map((a) => vm.newString(a));
-    const result = vm.callFunction(fn, vm.undefined, ...handles);
-    fn.dispose();
-    for (const h of handles) h.dispose();
-    if (result.error) {
-      const error = vm.dump(result.error);
-      result.error.dispose();
-      throw new Error(describe(error));
-    }
-    const type = vm.typeof(result.value);
-    const value = type === "number" || type === "string" ? vm.dump(result.value) : undefined;
-    result.value.dispose();
-    return value;
-  }
-
-  /** Runs the pending jobs of the runtime until none is left. */
-  private drain(): void {
-    const runtime = this.runtime!;
-    while (runtime.hasPendingJob()) {
-      const result = runtime.executePendingJobs();
-      if (result.error) {
-        const error = this.vm!.dump(result.error);
-        result.error.dispose();
-        throw new Error(describe(error));
-      }
-    }
-  }
-
-  /**
-   * Runs the pending jobs and the due timers, one timer at a time with the jobs of its promises
-   * in between, then sleeps until the next timer. The sleep is set even when a step threw.
-   */
-  private pump(): void {
-    clearTimeout(this.timer);
-    if (!this.vm) return;
-    try {
-      this.drain();
-      this.call("__flushRejections");
-      this.drain();
-      while (this.call("__fireTimers") === 1) {
-        this.drain();
-        this.call("__flushRejections");
-        this.drain();
-      }
-    } catch (error) {
-      this.emit("error", error);
-    }
-    try {
-      const delay = this.call("__timerDelay");
-      if (typeof delay === "number" && delay >= 0) {
-        this.timer = setTimeout(() => this.pump(), delay);
-      }
-    } catch (error) {
-      this.emit("error", error);
-    }
+    const thread = this.thread;
+    this.stopped = true;
+    this.thread = undefined;
+    // the thread owns the runtime and ends with it, which skips the disposal that aborts the
+    // wasm module after a collected cycle that held a weak reference
+    await thread?.terminate();
   }
 }
 
