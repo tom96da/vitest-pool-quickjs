@@ -5,6 +5,13 @@ import { describe, expect, it } from "vitest";
 
 const decode = (...bytes: number[]) => new TextDecoder().decode(new Uint8Array(bytes));
 
+/** A SharedArrayBuffer that holds the UTF-8 bytes of "a\u00e9". */
+function sharedBytes(): SharedArrayBuffer {
+  const sab = new SharedArrayBuffer(3);
+  new Uint8Array(sab).set([0x61, 0xc3, 0xa9]);
+  return sab;
+}
+
 describe("TextDecoder", () => {
   it.each([
     ["1 byte", [0x61], "a"],
@@ -39,6 +46,8 @@ describe("TextDecoder", () => {
   it.each([
     ["an ArrayBuffer", () => new Uint8Array([0x61, 0xc3, 0xa9]).buffer],
     ["a view with an offset", () => new Uint8Array([0x78, 0x61, 0xc3, 0xa9, 0x78]).subarray(1, 4)],
+    ["a view of a SharedArrayBuffer", () => new Uint8Array(sharedBytes())],
+    ["a SharedArrayBuffer", sharedBytes],
     ["a DataView", () => new DataView(new Uint8Array([0x78, 0x61, 0xc3, 0xa9]).buffer, 1)],
   ])("decodes %s", (_name, make) => {
     expect(new TextDecoder().decode(make())).toBe("a\u00e9");

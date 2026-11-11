@@ -32,10 +32,6 @@ interface Process {
   stderr: { write(text: string, callback?: () => void): boolean };
 }
 
-/** Decodes bytes in hex text as UTF-8. The host answers in hex too, since its strings end at a NUL. */
-const utf8 = (hex: string) =>
-  __utf8(hex).replace(/..../g, (unit) => String.fromCharCode(parseInt(unit, 16)));
-
 /** The listeners of `process`, by event name. */
 const listeners = new Map<string, Listener[]>();
 const raw = (name: string) => listeners.get(name) ?? [];
@@ -105,9 +101,7 @@ Object.assign(globalThis, {
       const bytes = ArrayBuffer.isView(input)
         ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
         : new Uint8Array(input);
-      let hex = "";
-      for (const b of bytes) hex += b.toString(16).padStart(2, "0");
-      return utf8(hex).replace(/^\ufeff/, "");
+      return __utf8(bytes.slice().buffer).replace(/^\ufeff/, "");
     }
   },
 });
@@ -205,7 +199,11 @@ if (!("AbortController" in globalThis)) {
 
 // an invalid sequence of escapes becomes U+FFFD, and a lone % stays as it is
 const decode = (text: string) =>
-  text.replace(/\+/g, " ").replace(/(?:%[0-9a-f]{2})+/gi, (run) => utf8(run.replaceAll("%", "")));
+  text
+    .replace(/\+/g, " ")
+    .replace(/(?:%[0-9a-f]{2})+/gi, (run) =>
+      __utf8(Uint8Array.from(run.slice(1).split("%"), (hex) => parseInt(hex, 16)).buffer),
+    );
 
 const encode = (text: string) =>
   encodeURIComponent(

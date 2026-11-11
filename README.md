@@ -54,4 +54,3 @@ quickjsPool({ externals: ["pathe"] });
 - Recursion deeper than about 1600 frames of a small function throws a `RangeError`.
 - The context has the globals of the web and of Node that Vitest reads, and no others.
 - The console does not print `time`, `timeEnd` and `timeLog`.
-- `TextDecoder` is slow on large buffers: 1 MB takes seconds.

@@ -121,17 +121,15 @@ try {
   vm = await QuickJS.create({ wasm, memoryLimit, maxStackSize });
   define("__stdout", (text) => report({ kind: "stdout", value: text }));
   define("__stderr", (text) => report({ kind: "stderr", value: text }));
-  define("__utf8", (bytes) =>
-    Buffer.from(bytes, "hex")
-      .toString("utf8")
-      .split("")
-      .map((c) => c.charCodeAt(0).toString(16).padStart(4, "0"))
-      .join(""),
-  );
   define("__post", (text) => report({ kind: "message", value: text }));
   define("__evalFile", (code, filename) => {
     vm.setProp(vm.global, "__evalResult", vm.evalCode(code, filename));
   });
+  const utf8 = vm.newFunction("__utf8", (bytes) =>
+    vm.newString(Buffer.from(bytes.toArrayBuffer()).toString("utf8")),
+  );
+  vm.setProp(vm.global, "__utf8", utf8);
+  utf8.dispose();
   const now = vm.newFunction("__now", () => vm.newNumber(performance.now() - start));
   vm.setProp(vm.global, "__now", now);
   now.dispose();
