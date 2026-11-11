@@ -173,3 +173,27 @@ describe("the reports of a stopped thread", () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe("the error event of a started thread", () => {
+  const fail = async () => {
+    const { worker, errors } = await started();
+    const error = new Error("boom");
+    (worker as unknown as { thread: Worker }).thread.emit("error", error);
+    return { worker, errors, error };
+  };
+
+  it("reaches the error event of the worker once", async () => {
+    const { worker, errors, error } = await fail();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toBe(error);
+    await worker.stop();
+  });
+
+  it("leaves the worker inert", async () => {
+    const { worker, errors } = await fail();
+    errors.length = 0;
+    worker.send({ type: "stop" } as WorkerRequest);
+    expect(errors).toEqual([]);
+    await worker.stop();
+  });
+});
