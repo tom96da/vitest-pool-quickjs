@@ -3,7 +3,7 @@
 
 import type { EventEmitter } from "node:events";
 import path from "node:path";
-import type { Worker } from "node:worker_threads";
+import { Worker } from "node:worker_threads";
 
 import { describe, expect, it, vi } from "vitest";
 import type { WorkerRequest } from "vitest/node";
@@ -69,14 +69,20 @@ describe("the error event of a pump", () => {
 });
 
 describe("a worker whose start throws", () => {
-  it("leaves a worker whose start threw inert", async () => {
+  it("stays inert after a start that threw", async () => {
     const worker = quickjsPool({
       preludes: [path.resolve(import.meta.dirname, "throwing-prelude.js")],
     }).createPoolWorker({ project: { config: { root, fsModuleCache: false } } } as never);
     const errors: unknown[] = [];
     worker.on("error", (error: unknown) => errors.push(error));
     await expect(worker.start()).rejects.toThrow("prelude failed");
-    worker.send({ type: "stop" } as WorkerRequest);
+    const postMessage = vi.spyOn(Worker.prototype, "postMessage");
+    try {
+      worker.send({ type: "stop" } as WorkerRequest);
+      expect(postMessage).not.toHaveBeenCalled();
+    } finally {
+      postMessage.mockRestore();
+    }
     expect(errors).toEqual([]);
   });
 });
@@ -178,8 +184,9 @@ describe("the error event of a started thread", () => {
   const fail = async () => {
     const { worker, errors } = await started();
     const error = new Error("boom");
-    (worker as unknown as { thread: Worker }).thread.emit("error", error);
-    return { worker, errors, error };
+    const thread = (worker as unknown as { thread: Worker }).thread;
+    thread.emit("error", error);
+    return { worker, errors, error, thread };
   };
 
   it("reaches the error event of the worker once", async () => {
@@ -189,11 +196,21 @@ describe("the error event of a started thread", () => {
     await worker.stop();
   });
 
+  it("terminates the thread", async () => {
+    const { worker, errors } = await started();
+    const thread = (worker as unknown as { thread: Worker }).thread;
+    const terminate = vi.spyOn(thread, "terminate");
+    thread.emit("error", new Error("boom"));
+    expect(terminate).toHaveBeenCalledOnce();
+    expect(errors).toHaveLength(1);
+    await worker.stop();
+  });
+
   it("leaves the worker inert", async () => {
-    const { worker, errors } = await fail();
-    errors.length = 0;
+    const { worker, thread } = await fail();
+    const postMessage = vi.spyOn(thread, "postMessage");
     worker.send({ type: "stop" } as WorkerRequest);
-    expect(errors).toEqual([]);
+    expect(postMessage).not.toHaveBeenCalled();
     await worker.stop();
   });
 });
