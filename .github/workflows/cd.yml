@@ -118,8 +118,27 @@ jobs:
       - name: Run tests
         run: pnpm exec vitest run
 
+      - name: Remove the badges from the README
+        run: |
+          set -euo pipefail
+          awk '
+            /<!-- badges:start -->/ { if (skip || starts++) exit 1; skip = 1; next }
+            /<!-- badges:end -->/ { if (!skip || ends++) exit 1; skip = 0; next }
+            !skip
+            END { if (skip || starts != 1 || ends != 1) exit 1 }
+          ' README.md | cat -s > "$RUNNER_TEMP/README.md"
+          mv "$RUNNER_TEMP/README.md" README.md
+          ! grep -q 'badges:' README.md
+
       - name: Pack
         run: pnpm pack
+
+      - name: Check the README in the tarball
+        run: |
+          set -euo pipefail
+          readme=$(tar -xzOf vitest-pool-quickjs-*.tgz package/README.md)
+          test -n "$readme"
+          ! grep -q -E 'badges:|img\.shields\.io|badge\.svg' <<< "$readme"
 
       - name: Upload
         uses: actions/upload-artifact@v7
