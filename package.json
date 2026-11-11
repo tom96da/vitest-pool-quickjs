@@ -43,9 +43,8 @@
     "prepack": "clear-package-json package.json -o package.json"
   },
   "dependencies": {
-    "@jitl/quickjs-ng-wasmfile-release-sync": "^0.32.0",
     "pathe": "^2.0.3",
-    "quickjs-emscripten": "^0.32.0",
+    "quickjs-wasi": "~3.6.4",
     "rolldown": "~1.2.18"
   },
   "devDependencies": {

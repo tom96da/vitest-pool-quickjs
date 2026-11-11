@@ -21,8 +21,9 @@ export interface QuickJSPoolOptions {
   plugins?: Plugin[];
 }
 
-/** What a pool worker loads into a new context: the bundled worker and the scripts before it. */
+/** What a pool worker loads into a new context: the engine, the bundled worker and the scripts before it. */
 export interface Prepared {
+  wasm: WebAssembly.Module;
   worker: string;
   preludes: { name: string; code: string }[];
 }

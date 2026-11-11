@@ -23,7 +23,7 @@ export default defineConfig([
   {
     entry: { thread: "src/thread.mts" },
     deps: {
-      onlyImport: ["@jitl/quickjs-ng-wasmfile-release-sync", "quickjs-emscripten"],
+      onlyImport: ["quickjs-wasi"],
     },
     format: "esm",
     fixedExtension: false,

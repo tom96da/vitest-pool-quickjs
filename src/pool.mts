@@ -4,6 +4,7 @@
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 
 import type { PoolOptions, PoolRunnerInitializer, PoolWorker, WorkerRequest } from "vitest/node";
@@ -14,6 +15,13 @@ import { decode, encode } from "./worker/codec.mts";
 
 /** The thread that hosts one context. */
 const threadUrl = asset("thread");
+
+/** The engine, compiled once and shared with every thread. */
+let engine: Promise<WebAssembly.Module> | undefined;
+const compileEngine = (): Promise<WebAssembly.Module> =>
+  (engine ??= readFile(fileURLToPath(import.meta.resolve("quickjs-wasi/quickjs.wasm"))).then(
+    (bytes) => WebAssembly.compile(bytes),
+  ));
 
 class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
   readonly name = "quickjs";
@@ -103,6 +111,7 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
       builds.set(root, buildWorker(root, options));
     }
     return {
+      wasm: await compileEngine(),
       worker: await builds.get(root)!,
       preludes: await Promise.all(
         (options.preludes ?? []).map(async (file) => ({

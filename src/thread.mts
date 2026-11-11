@@ -3,17 +3,19 @@
 
 import { parentPort, workerData } from "node:worker_threads";
 
-import variant from "@jitl/quickjs-ng-wasmfile-release-sync";
-import { newQuickJSWASMModule } from "quickjs-emscripten";
-import type { QuickJSContext, QuickJSHandle, QuickJSRuntime } from "quickjs-emscripten";
+import { JSException, QuickJS } from "quickjs-wasi";
+import type { JSValueHandle } from "quickjs-wasi";
 
 import type { Prepared, Report } from "./types.mts";
 
 /** The memory limit of one context. */
 const memoryLimit = 1024 * 1024 * 1024;
 
+/** The native stack the engine may use. A larger size lets deep recursion overflow the host stack. */
+const maxStackSize = 393216;
+
 const port = parentPort!;
-const { worker, preludes }: Prepared = workerData;
+const { wasm, worker, preludes }: Prepared = workerData;
 
 /**
  * Sends a report to the pool.
@@ -22,20 +24,23 @@ const { worker, preludes }: Prepared = workerData;
 const report = (message: Report): void => port.postMessage(message);
 
 /**
- * Formats a value that a QuickJS call threw.
- * @param error - the dumped value, an error object or any other thrown value
- * @returns the name, message and stack of an error, or the JSON of another value
+ * Runs a call into the context and turns the exception of the context into an error that
+ * carries its name, message and stack.
+ * @param fn - the call
+ * @returns what the call returns
  */
-function describe(error: unknown): string {
-  if (typeof error === "object" && error !== null) {
-    const e = error as { name?: string; message?: string; stack?: string };
-    return `${e.name}: ${e.message}${e.stack ? `\n${e.stack}` : ""}`;
+function guest<T>(fn: () => T): T {
+  try {
+    return vm.withScope(fn);
+  } catch (error) {
+    if (!(error instanceof JSException)) throw error;
+    const { name, message, stack } = error;
+    error.dispose();
+    throw new Error(`${name}: ${message}${stack ? `\n${stack}` : ""}`);
   }
-  return `thrown: ${JSON.stringify(error)}`;
 }
 
-let runtime: QuickJSRuntime;
-let vm: QuickJSContext;
+let vm: QuickJS;
 let timer: NodeJS.Timeout | undefined;
 
 /**
@@ -44,9 +49,9 @@ let timer: NodeJS.Timeout | undefined;
  * @param fn - the host function the global calls; a string it returns is the result
  */
 function define(name: string, fn: (...args: string[]) => string | void): void {
-  const handle = vm.newFunction(name, (...args: QuickJSHandle[]) => {
-    const result = fn(...args.map((a) => vm.getString(a)));
-    return typeof result === "string" ? vm.newString(result) : undefined;
+  const handle = vm.newFunction(name, (...args: JSValueHandle[]) => {
+    const result = fn(...args.map((a) => a.toString()));
+    return typeof result === "string" ? vm.newString(result) : vm.undefined;
   });
   vm.setProp(vm.global, name, handle);
   handle.dispose();
@@ -58,13 +63,7 @@ function define(name: string, fn: (...args: string[]) => string | void): void {
  * @param name - the file name that stack traces show
  */
 function run(code: string, name: string): void {
-  const result = vm.evalCode(code, name);
-  if (result.error) {
-    const error = vm.dump(result.error);
-    result.error.dispose();
-    throw new Error(describe(error));
-  }
-  result.value.dispose();
+  guest(() => vm.evalCode(code, name));
 }
 
 /**
@@ -74,32 +73,21 @@ function run(code: string, name: string): void {
  * @returns the result when it is a number or a string, otherwise `undefined`
  */
 function call(name: string, ...args: string[]): number | string | undefined {
-  const fn = vm.getProp(vm.global, name);
-  const handles = args.map((a) => vm.newString(a));
-  const result = vm.callFunction(fn, vm.undefined, ...handles);
-  fn.dispose();
-  for (const h of handles) h.dispose();
-  if (result.error) {
-    const error = vm.dump(result.error);
-    result.error.dispose();
-    throw new Error(describe(error));
-  }
-  const type = vm.typeof(result.value);
-  const value = type === "number" || type === "string" ? vm.dump(result.value) : undefined;
-  result.value.dispose();
-  return value;
+  return guest(() => {
+    const result = vm.callFunction(
+      vm.global.getProp(name),
+      vm.undefined,
+      ...args.map((a) => vm.newString(a)),
+    );
+    return result.isNumber ? result.toNumber() : result.isString ? result.toString() : undefined;
+  });
 }
 
 /** Runs the pending jobs of the runtime until none is left. */
 function drain(): void {
-  while (runtime.hasPendingJob()) {
-    const result = runtime.executePendingJobs();
-    if (result.error) {
-      const error = vm.dump(result.error);
-      result.error.dispose();
-      throw new Error(describe(error));
-    }
-  }
+  guest(() => {
+    while (vm.executePendingJobs() > 0);
+  });
 }
 
 /**
@@ -130,9 +118,7 @@ function pump(): void {
 
 try {
   const start = performance.now();
-  runtime = (await newQuickJSWASMModule(variant)).newRuntime();
-  runtime.setMemoryLimit(memoryLimit);
-  vm = runtime.newContext();
+  vm = await QuickJS.create({ wasm, memoryLimit, maxStackSize });
   define("__stdout", (text) => report({ kind: "stdout", value: text }));
   define("__stderr", (text) => report({ kind: "stderr", value: text }));
   define("__utf8", (bytes) =>
@@ -144,14 +130,7 @@ try {
   );
   define("__post", (text) => report({ kind: "message", value: text }));
   define("__evalFile", (code, filename) => {
-    const result = vm.evalCode(code, filename);
-    if (result.error) {
-      const error = vm.dump(result.error);
-      result.error.dispose();
-      throw new Error(describe(error));
-    }
-    vm.setProp(vm.global, "__evalResult", result.value);
-    result.value.dispose();
+    vm.setProp(vm.global, "__evalResult", vm.evalCode(code, filename));
   });
   const now = vm.newFunction("__now", () => vm.newNumber(performance.now() - start));
   vm.setProp(vm.global, "__now", now);
