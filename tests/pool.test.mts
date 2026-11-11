@@ -81,6 +81,17 @@ describe.concurrent("a failing run", () => {
   });
 });
 
+describe.concurrent("a job that throws", () => {
+  let report: Report;
+  beforeAll(async () => {
+    report = await runFixture("fixture-job");
+  });
+
+  it("reports the message of the error", () => {
+    expect(report.stdout + report.stderr).toContain("job exploded");
+  });
+});
+
 describe.concurrent("an import that externals does not list", () => {
   it("names the unlisted file and the externals option in its error", async () => {
     const { code, stdout, stderr } = await runFixture("fixture-missing-external");
@@ -153,7 +164,7 @@ describe.concurrent("projects that pass", () => {
     ["fixture-process", "Tests  6 passed (6)"],
     ["fixture-rejections", "Tests  7 passed (7)"],
     ["fixture-text-decoder", "Tests  24 passed (24)"],
-    ["fixture-timers", "Tests  5 passed (5)"],
+    ["fixture-timers", "Tests  6 passed (6)"],
   ])("passes every test of the project %s", async (name, summary) => {
     const { code, stdout } = await runFixture(name);
     expect(stdout).toContain(summary);

@@ -6,6 +6,15 @@ import { describe, expect, it } from "vitest";
 import { collect, sleep } from "../fixture-helpers.mts";
 
 describe("timers", () => {
+  it("calls a host function in a microtask", async () => {
+    let elapsed = -1;
+    queueMicrotask(() => {
+      elapsed = performance.now();
+    });
+    await sleep(10);
+    expect(elapsed).toBeGreaterThan(0);
+  });
+
   it("waits at least the delay of a timer", async () => {
     const start = performance.now();
     await sleep(30);
