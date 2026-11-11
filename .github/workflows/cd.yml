@@ -1,0 +1,228 @@
+# Copyright (c) 2026 tom96da
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: CD
+
+permissions: {}
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit SHA to run the dry run against"
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' }}
+
+jobs:
+  verify:
+    name: Verify
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - name: Resolve the commit SHA
+        id: sha
+        env:
+          INPUT_COMMIT: ${{ inputs.commit }}
+        run: echo "sha=${INPUT_COMMIT:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Check the version and the dist-tag
+        id: check
+        run: |
+          set -euo pipefail
+          version=$(jq -r .version package.json)
+          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$version" =~ $semver ]]; then
+            echo "The version $version in package.json is not a semantic version."
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "The tag $GITHUB_REF_NAME does not match the version $version in package.json."
+            exit 1
+          fi
+          if pnpm view "vitest-pool-quickjs@$version" version > /dev/null 2>&1; then
+            echo "Version $version is already published."
+            exit 1
+          fi
+          # 1.2.3 goes to latest, 1.2.3-beta.1 to beta
+          tag=latest
+          if [[ "$version" == *-* ]]; then
+            pre=${version#*-}
+            tag=${pre%%.*}
+            [[ "$tag" =~ ^[a-z][a-z0-9-]*$ ]] || tag=next
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  check:
+    name: Check
+    needs: verify
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js 26
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm ci
+
+      - name: Lint
+        run: pnpm exec oxlint --type-aware
+
+      - name: Format
+        run: pnpm exec oxfmt --check
+
+      - name: Type check
+        run: pnpm exec tsc --noEmit
+
+      - name: Build
+        run: pnpm exec tsdown
+
+      - name: Run tests
+        run: pnpm exec vitest run
+
+      - name: Pack
+        run: pnpm pack
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          path: vitest-pool-quickjs-${{ needs.verify.outputs.version }}.tgz
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish
+    needs: [verify, check]
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    environment: Release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Download the tarball
+        uses: actions/download-artifact@v8
+        with:
+          name: vitest-pool-quickjs-${{ needs.verify.outputs.version }}.tgz
+          path: artifact
+
+      # the tarball that Check built and tested is the one that is published
+      - name: Publish
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          NPM_TAG: ${{ needs.verify.outputs.tag }}
+        run: |
+          set -euo pipefail
+          args=(--tag "$NPM_TAG" --no-git-checks)
+          if [ "$DRY_RUN" = true ]; then args+=(--dry-run); fi
+          pnpm publish "artifact/vitest-pool-quickjs-$VERSION.tgz" "${args[@]}"
+
+  release:
+    name: GitHub release
+    needs: [verify, publish]
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download the tarball
+        uses: actions/download-artifact@v8
+        with:
+          name: vitest-pool-quickjs-${{ needs.verify.outputs.version }}.tgz
+          path: artifact
+
+      - name: Write release notes
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          version="$VERSION"
+          date=$(sed -n "s/^## \[$version\][[:space:]]*-[[:space:]]*\(.*\)\$/\1/p" CHANGELOG.md)
+          awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; next }
+            found && (/^## \[/ || /^\[.*\]: /) { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/body.md"
+          if [ -n "$date" ] && [ -s "$RUNNER_TEMP/body.md" ]; then
+            { echo "Released on $date"; cat "$RUNNER_TEMP/body.md"; } > "$RUNNER_TEMP/notes.md"
+          fi
+          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
+            prev=$(git tag --sort=-v:refname | grep -v "^v$version$" | head -1 || true)
+            {
+              if [ -n "$prev" ]; then
+                echo "Changes since $prev:"
+                echo
+                git log "$prev..HEAD" --no-merges --pretty='format:- %s (%h)'
+              else
+                echo "Initial release."
+              fi
+            } > "$RUNNER_TEMP/notes.md"
+          fi
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: v${{ needs.verify.outputs.version }}
+          NPM_TAG: ${{ needs.verify.outputs.tag }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "$NPM_TAG" != latest ]; then args+=(--prerelease); fi
+          gh release create "$TAG" artifact/*.tgz --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" "${args[@]}"
