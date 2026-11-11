@@ -258,3 +258,10 @@ describe("FinalizationRegistry", () => {
     expect(new FinalizationRegistry(() => {})).toBeInstanceOf(FinalizationRegistry);
   });
 });
+
+describe("recursion", () => {
+  it("throws a RangeError that the code can catch", () => {
+    const f = (): void => f();
+    expect(f).toThrow(RangeError);
+  });
+});
