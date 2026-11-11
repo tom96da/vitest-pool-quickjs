@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-12
+
 ### Fixed
 
 - let a test import a relative file such as a CommonJS file through `externals` ([3283a52](https://github.com/tom96da/vitest-pool-quickjs/commit/3283a52))
@@ -21,5 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - automatically provide missing Web and Node.js globals
 - easily integrate by adding it to your config file
 
-[Unreleased]: https://github.com/tom96da/vitest-pool-quickjs/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tom96da/vitest-pool-quickjs/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.1.1
 [0.1.0]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.1.0
