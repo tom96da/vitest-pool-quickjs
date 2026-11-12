@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `TextEncoder` is available ([4086e68](https://github.com/tom96da/vitest-pool-quickjs/commit/4086e68))
+- the `fatal` and `ignoreBOM` options of `TextDecoder` are available ([4086e68](https://github.com/tom96da/vitest-pool-quickjs/commit/4086e68))
+- an async function or a promise executor that rejects with nothing to handle it is reported ([f2fdafa](https://github.com/tom96da/vitest-pool-quickjs/commit/f2fdafa))
+
+### Changed
+
+- decode a view of a `SharedArrayBuffer`, but no longer the buffer itself ([4086e68](https://github.com/tom96da/vitest-pool-quickjs/commit/4086e68))
+
+### Fixed
+
+- make `expect(promise).resolves` and `.rejects` work ([f2fdafa](https://github.com/tom96da/vitest-pool-quickjs/commit/f2fdafa))
+
 ## [0.2.0] - 2026-11-12
 
 ### Changed
