@@ -73,11 +73,34 @@ jobs:
       - name: Install deps
         run: pnpm ci
 
-      - name: Build
-        run: pnpm exec tsdown
-
       - name: Run tests
         run: pnpm exec vitest run
+
+  build:
+    name: Build
+    needs: changed
+    if: needs.changed.outputs.js == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js 26
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm ci
+
+      - name: Build
+        run: pnpm exec tsdown
 
   check:
     name: Check
@@ -114,7 +137,7 @@ jobs:
   passed:
     name: CI Passed
     if: always()
-    needs: [changed, test, check]
+    needs: [changed, test, check, build]
     runs-on: ubuntu-latest
     steps:
       - name: Check job results

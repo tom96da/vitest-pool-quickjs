@@ -112,11 +112,35 @@ jobs:
       - name: Type check
         run: pnpm exec tsc --noEmit
 
-      - name: Build
-        run: pnpm exec tsdown
-
       - name: Run tests
         run: pnpm exec vitest run
+
+  build:
+    name: Build
+    needs: [verify, check]
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js 26
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm ci
+
+      - name: Build
+        run: pnpm exec tsdown
 
       - name: Remove the badges from the README
         run: |
@@ -150,7 +174,7 @@ jobs:
 
   publish:
     name: Publish
-    needs: [verify, check]
+    needs: [verify, build]
     timeout-minutes: 10
     runs-on: ubuntu-latest
     environment: Release
@@ -173,7 +197,6 @@ jobs:
           name: vitest-pool-quickjs-${{ needs.verify.outputs.version }}.tgz
           path: artifact
 
-      # the tarball that Check built and tested is the one that is published
       - name: Publish
         env:
           VERSION: ${{ needs.verify.outputs.version }}
