@@ -162,6 +162,7 @@ describe.concurrent("projects that pass", () => {
     ["fixture-options", "Tests  7 passed (7)"],
     ["fixture-prelude", "Tests  1 passed (1)"],
     ["fixture-process", "Tests  6 passed (6)"],
+    ["fixture-promise-matchers", "Tests  3 passed (3)"],
     ["fixture-rejections", "Tests  11 passed (11)"],
     ["fixture-text-decoder", "Tests  24 passed (24)"],
     ["fixture-timers", "Tests  6 passed (6)"],
