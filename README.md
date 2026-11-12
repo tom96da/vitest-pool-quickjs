@@ -8,7 +8,7 @@
 <!-- badges:end -->
 
 
-A [Vitest](https://vitest.dev/) pool that runs test files in [QuickJS](https://bellard.org/quickjs/).
+A [Vitest](https://vitest.dev/) pool that runs test files in [QuickJS](https://quickjs-ng.github.io/quickjs/).
 
 ## How it works
 
