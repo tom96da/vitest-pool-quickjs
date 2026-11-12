@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- all the extensions of quickjs-wasi are available through the `extensions` option ([6cc1129](https://github.com/tom96da/vitest-pool-quickjs/commit/6cc1129))
+- file-based snapshot assertions are available ([744b1ac](https://github.com/tom96da/vitest-pool-quickjs/commit/744b1ac))
+
 ## [0.2.1] - 2026-11-12
 
 ### Added
