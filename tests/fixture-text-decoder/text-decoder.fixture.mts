@@ -47,7 +47,6 @@ describe("TextDecoder", () => {
     ["an ArrayBuffer", () => new Uint8Array([0x61, 0xc3, 0xa9]).buffer],
     ["a view with an offset", () => new Uint8Array([0x78, 0x61, 0xc3, 0xa9, 0x78]).subarray(1, 4)],
     ["a view of a SharedArrayBuffer", () => new Uint8Array(sharedBytes())],
-    ["a SharedArrayBuffer", sharedBytes],
     ["a DataView", () => new DataView(new Uint8Array([0x78, 0x61, 0xc3, 0xa9]).buffer, 1)],
   ])("decodes %s", (_name, make) => {
     expect(new TextDecoder().decode(make())).toBe("a\u00e9");

@@ -15,17 +15,8 @@ export function runInThisContext(code: string, options?: RunOptions): unknown {
 
 export const runInContext = runInThisContext;
 
-// Tests call this as `gc`: allocating and dropping cyclic objects makes QuickJS collect the weak
-// references that a test waits for.
-export const runInNewContext = (): (() => void) => () => {
-  let keep: object[] = [];
-  for (let i = 0; i < 100_000; i++) {
-    const a: { self?: object } = {};
-    a.self = a;
-    keep.push(a);
-  }
-  keep = [];
-};
+// Tests call this as `gc`.
+export const runInNewContext = (): (() => void) => __gc;
 
 export class Script {
   private code: string;

@@ -15,7 +15,7 @@ const memoryLimit = 1024 * 1024 * 1024;
 const maxStackSize = 393216;
 
 const port = parentPort!;
-const { wasm, worker, preludes }: Prepared = workerData;
+const { wasm, extensions, worker, preludes }: Prepared = workerData;
 
 /**
  * Sends a report to the pool.
@@ -139,20 +139,22 @@ function pump(): void {
 
 try {
   const start = performance.now();
-  vm = await QuickJS.create({ wasm, memoryLimit, maxStackSize, onUnhandledRejection: track });
+  vm = await QuickJS.create({
+    wasm,
+    extensions,
+    memoryLimit,
+    maxStackSize,
+    onUnhandledRejection: track,
+  });
   rejections = vm.newObject();
   vm.setProp(vm.global, "__rejections", rejections);
   define("__stdout", (text) => report({ kind: "stdout", value: text }));
   define("__stderr", (text) => report({ kind: "stderr", value: text }));
   define("__post", (text) => report({ kind: "message", value: text }));
+  define("__gc", () => vm.runGC());
   define("__evalFile", (code, filename) => {
     vm.setProp(vm.global, "__evalResult", vm.evalCode(code, filename));
   });
-  const utf8 = vm.newFunction("__utf8", (bytes) =>
-    vm.newString(Buffer.from(bytes.toArrayBuffer()).toString("utf8")),
-  );
-  vm.setProp(vm.global, "__utf8", utf8);
-  utf8.dispose();
   const now = vm.newFunction("__now", () => vm.newNumber(performance.now() - start));
   vm.setProp(vm.global, "__now", now);
   now.dispose();

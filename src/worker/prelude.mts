@@ -63,7 +63,7 @@ const proc: Process = {
   platform: "quickjs",
   versions: {},
   cwd: () => "/",
-  nextTick: (f) => void Promise.resolve().then(f),
+  nextTick: (f) => queueMicrotask(f),
   emitWarning() {},
   listeners: (name) => (listeners.get(name) ?? []).map((f) => (f as Wrapper).listener ?? f),
   on,
@@ -94,16 +94,6 @@ Object.assign(globalThis, {
     dispatchEvent() {}
   },
   Event: class {},
-  // no `fatal`, `ignoreBOM` or `stream` options
-  TextDecoder: class {
-    decode(input?: ArrayBuffer | ArrayBufferView): string {
-      if (input === undefined) return "";
-      const bytes = ArrayBuffer.isView(input)
-        ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
-        : new Uint8Array(input);
-      return __utf8(bytes.slice().buffer).replace(/^\ufeff/, "");
-    }
-  },
 });
 if (!("console" in globalThis)) Object.assign(globalThis, { console: {} });
 // vitest swaps Error.prepareStackTrace, a V8 hook. QuickJS builds `stack` itself and loses it then.
@@ -198,11 +188,12 @@ if (!("AbortController" in globalThis)) {
 }
 
 // an invalid sequence of escapes becomes U+FFFD, and a lone % stays as it is
+const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 const decode = (text: string) =>
   text
     .replace(/\+/g, " ")
     .replace(/(?:%[0-9a-f]{2})+/gi, (run) =>
-      __utf8(Uint8Array.from(run.slice(1).split("%"), (hex) => parseInt(hex, 16)).buffer),
+      utf8.decode(Uint8Array.from(run.slice(1).split("%"), (hex) => parseInt(hex, 16))),
     );
 
 const encode = (text: string) =>

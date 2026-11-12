@@ -24,6 +24,8 @@ export interface QuickJSPoolOptions {
 /** What a pool worker loads into a new context: the engine, the bundled worker and the scripts before it. */
 export interface Prepared {
   wasm: WebAssembly.Module;
+  /** The extensions of the engine, which give the context `TextEncoder` and `TextDecoder`. */
+  extensions: { name: string; wasm: WebAssembly.Module }[];
   worker: string;
   preludes: { name: string; code: string }[];
 }

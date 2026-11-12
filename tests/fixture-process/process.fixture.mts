@@ -19,6 +19,14 @@ describe("process listeners", () => {
     expect(calls).toBe(1);
   });
 
+  it("runs a nextTick callback before a timer that was set earlier", async () => {
+    const order: string[] = [];
+    setTimeout(() => order.push("timer"), 0);
+    process.nextTick(() => order.push("tick"));
+    await sleep(1);
+    expect(order).toEqual(["tick", "timer"]);
+  });
+
   it("returns the original function of a once listener", () => {
     const f = () => {};
     process.once("fixture-once", f);

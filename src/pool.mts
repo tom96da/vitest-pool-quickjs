@@ -16,12 +16,19 @@ import { decode, encode } from "./worker/codec.mts";
 /** The thread that hosts one context. */
 const threadUrl = asset("thread");
 
-/** The engine, compiled once and shared with every thread. */
-let engine: Promise<WebAssembly.Module> | undefined;
-const compileEngine = (): Promise<WebAssembly.Module> =>
-  (engine ??= readFile(fileURLToPath(import.meta.resolve("quickjs-wasi/quickjs.wasm"))).then(
-    (bytes) => WebAssembly.compile(bytes),
-  ));
+/** The modules of quickjs-wasi, compiled once and shared with every thread. */
+const compiled = new Map<string, Promise<WebAssembly.Module>>();
+const compile = (specifier: string): Promise<WebAssembly.Module> => {
+  if (!compiled.has(specifier)) {
+    compiled.set(
+      specifier,
+      readFile(fileURLToPath(import.meta.resolve(specifier))).then((bytes) =>
+        WebAssembly.compile(bytes),
+      ),
+    );
+  }
+  return compiled.get(specifier)!;
+};
 
 class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
   readonly name = "quickjs";
@@ -111,7 +118,8 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
       builds.set(root, buildWorker(root, options));
     }
     return {
-      wasm: await compileEngine(),
+      wasm: await compile("quickjs-wasi/quickjs.wasm"),
+      extensions: [{ name: "encoding", wasm: await compile("quickjs-wasi/encoding.so") }],
       worker: await builds.get(root)!,
       preludes: await Promise.all(
         (options.preludes ?? []).map(async (file) => ({

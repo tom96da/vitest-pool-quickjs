@@ -5,8 +5,6 @@
 declare global {
   /** Milliseconds since the context started. */
   function __now(): number;
-  /** Decodes bytes as UTF-8. A byte order mark stays in the result. */
-  function __utf8(bytes: ArrayBuffer): string;
   /**
    * The rejections that no handler has seen, by promise. The thread writes an entry when a promise
    * rejects without a handler and sets it to `undefined` when a handler arrives.
@@ -18,6 +16,8 @@ declare global {
   function __stdout(text: string): void;
   /** Writes to the standard error of the process. */
   function __stderr(text: string): void;
+  /** Collects the garbage of the context, so that weak references to dead objects clear. */
+  function __gc(): void;
   /** Evaluates code under a file name, so that `Error` stacks name that file. */
   function __evalFile(code: string, filename: string): void;
   /** The result of the last `__evalFile` call. */
