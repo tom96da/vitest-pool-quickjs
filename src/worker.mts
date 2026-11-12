@@ -9,6 +9,7 @@ import * as vitest from "vitest";
 import { init, runBaseTests, setupEnvironment } from "vitest/worker";
 
 import { decode, encode } from "./worker/codec.mts";
+import { SnapshotEnvironment } from "./worker/snapshots.mts";
 
 const handlers = new Set<(message: unknown) => unknown>();
 
@@ -26,7 +27,14 @@ init({
   post: (response) => __post(encode(response)),
   on: (handler) => void handlers.add(handler),
   off: (handler) => void handlers.delete(handler),
-  runTests: (state, traces) => runBaseTests("run", state, traces),
+  runTests: (state, traces) => {
+    // the environment of a config wins, because vitest resolves its own only when none is set
+    if (!state.config.snapshotEnvironment)
+      state.config.snapshotOptions.snapshotEnvironment = new SnapshotEnvironment(
+        state.ctx.files.map((f) => f.filepath),
+      );
+    return runBaseTests("run", state, traces);
+  },
   collectTests: (state, traces) => runBaseTests("collect", state, traces),
   setup: setupEnvironment,
 });

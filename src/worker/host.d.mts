@@ -20,6 +20,12 @@ declare global {
   function __gc(): void;
   /** Evaluates code under a file name, so that `Error` stacks name that file. */
   function __evalFile(code: string, filename: string): void;
+  /** Reads a text file of the host, or `undefined` when there is none. */
+  function __readFile(file: string): Promise<string | undefined>;
+  /** Writes a text file of the host and the directories above it. */
+  function __writeFile(file: string, text: string): Promise<void>;
+  /** Removes a file of the host, if there is one. */
+  function __removeFile(file: string): Promise<void>;
   /** The result of the last `__evalFile` call. */
   var __evalResult: unknown;
   /** Receives one encoded message from the pool. The worker defines it. */

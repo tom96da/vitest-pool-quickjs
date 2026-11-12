@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 import { execFile } from "node:child_process";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
 import { beforeAll, describe, expect, it } from "vitest";
+
+import { snapshotDir } from "./fixture-snapshots/snapshot-dir.mts";
 
 const run = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "..");
@@ -122,6 +125,62 @@ describe.concurrent("an extension that does not exist", () => {
     expect(report.stdout + report.stderr).toContain(
       "it accepts url, encoding, headers, crypto, structured-clone",
     );
+  });
+});
+
+describe("file snapshots", () => {
+  const out = path.join(snapshotDir, "out.txt");
+  beforeAll(async () => {
+    await rm(snapshotDir, { recursive: true, force: true });
+  });
+
+  it("writes the snapshots that are new", async () => {
+    const { code, stdout } = await runFixture("fixture-snapshots", ["-u"]);
+    expect(code).toBe(0);
+    expect(stdout).toContain("Snapshots  2 written");
+    expect(await readFile(out, "utf8")).toBe("text");
+  });
+
+  it("passes when the snapshots match", async () => {
+    const { code, stdout } = await runFixture("fixture-snapshots");
+    expect(code).toBe(0);
+    expect(stdout).toContain("Tests  4 passed (4)");
+  });
+
+  it("fails when a file snapshot differs", async () => {
+    await writeFile(out, "other");
+    const { code, stdout, stderr } = await runFixture("fixture-snapshots");
+    expect(code).toBe(1);
+    expect(stdout + stderr).toContain("mismatched");
+  });
+
+  it("rewrites a file snapshot that differs when asked to update", async () => {
+    const { code } = await runFixture("fixture-snapshots", ["-u"]);
+    expect(code).toBe(0);
+    expect(await readFile(out, "utf8")).toBe("text");
+  });
+
+  it("removes the snapshot file of a test file that has no snapshot when asked to update", async () => {
+    const orphan = path.join(snapshotDir, "plain.fixture.mts.snap");
+    await writeFile(orphan, "// Vitest Snapshot v1\n\nexports[`gone 1`] = `1`;\n");
+    const { code } = await runFixture("fixture-snapshots", ["-u"]);
+    expect(code).toBe(0);
+    await expect(readFile(orphan, "utf8")).rejects.toThrow("ENOENT");
+  });
+});
+
+describe("an inline snapshot to write", () => {
+  it("is refused and leaves the test file as it was", async () => {
+    const file = path.join(root, "tests/fixture-inline-snapshot/inline.fixture.mts");
+    const before = await readFile(file, "utf8");
+    try {
+      const { code, stdout, stderr } = await runFixture("fixture-inline-snapshot", ["-u"]);
+      expect(code).toBe(1);
+      expect(stdout + stderr).toContain("cannot write an inline snapshot into");
+      expect(await readFile(file, "utf8")).toBe(before);
+    } finally {
+      await writeFile(file, before);
+    }
   });
 });
 

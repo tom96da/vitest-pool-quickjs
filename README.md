@@ -71,6 +71,8 @@ quickjsPool({ extensions: ["structured-clone", "crypto"] });
 - The context has the globals of the web and of Node that Vitest reads and those of the extensions
   that the option lists, and no others.
 - The console does not print `time`, `timeEnd` and `timeLog`.
+- An inline snapshot is compared but never written into the test file, so a new or an outdated one
+  fails the run. Use `toMatchSnapshot` or `toMatchFileSnapshot` to write one.
 
 ## License
 

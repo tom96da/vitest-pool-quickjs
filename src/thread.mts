@@ -1,6 +1,8 @@
 // Copyright (c) 2026 tom96da
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { parentPort, workerData } from "node:worker_threads";
 
 import { JSException, QuickJS } from "quickjs-wasi";
@@ -73,6 +75,31 @@ function define(name: string, fn: (...args: string[]) => string | void): void {
   const handle = vm.newFunction(name, (...args: JSValueHandle[]) => {
     const result = fn(...args.map((a) => a.toString()));
     return typeof result === "string" ? vm.newString(result) : vm.undefined;
+  });
+  vm.setProp(vm.global, name, handle);
+  handle.dispose();
+}
+
+/**
+ * Defines a global function of string arguments in the context that returns a promise. The host
+ * work runs on the event loop of the thread, and its result settles the promise and runs the jobs
+ * that wait on it.
+ * @param name - the name of the global
+ * @param fn - the host work, which resolves to the result as a string
+ */
+function defineAsync(name: string, fn: (...args: string[]) => Promise<string | void>): void {
+  const handle = vm.newFunction(name, (...args: JSValueHandle[]) => {
+    const deferred = vm.newPromise();
+    fn(...args.map((a) => a.toString()))
+      .then(
+        (result) =>
+          vm.withScope(() =>
+            deferred.resolve(typeof result === "string" ? vm.newString(result) : vm.undefined),
+          ),
+        (error: Error) => vm.withScope(() => deferred.reject(vm.newError(error))),
+      )
+      .then(pump, (error) => report({ kind: "error", value: error }));
+    return deferred.handle;
   });
   vm.setProp(vm.global, name, handle);
   handle.dispose();
@@ -155,6 +182,17 @@ try {
   define("__evalFile", (code, filename) => {
     vm.setProp(vm.global, "__evalResult", vm.evalCode(code, filename));
   });
+  defineAsync("__readFile", (file) =>
+    readFile(file, "utf8").catch((error: NodeJS.ErrnoException) => {
+      // a missing file reads as nothing
+      if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
+    }),
+  );
+  defineAsync("__writeFile", async (file, text) => {
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, text, "utf8");
+  });
+  defineAsync("__removeFile", (file) => rm(file, { force: true }));
   const now = vm.newFunction("__now", () => vm.newNumber(performance.now() - start));
   vm.setProp(vm.global, "__now", now);
   now.dispose();
