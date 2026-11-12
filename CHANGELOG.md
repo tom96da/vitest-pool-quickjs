@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-13
+
 ### Added
 
 - all the extensions of quickjs-wasi are available through the `extensions` option ([6cc1129](https://github.com/tom96da/vitest-pool-quickjs/commit/6cc1129))
@@ -62,7 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - automatically provide missing Web and Node.js globals
 - easily integrate by adding it to your config file
 
-[Unreleased]: https://github.com/tom96da/vitest-pool-quickjs/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/tom96da/vitest-pool-quickjs/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.2
 [0.2.1]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.1
 [0.2.0]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.0
 [0.1.2]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.1.2
