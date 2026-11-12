@@ -3,6 +3,12 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+describe("a global of an extension that the option does not list", () => {
+  it.each(["structuredClone", "crypto", "Headers"])("leaves %s undefined", (name) => {
+    expect(name in globalThis).toBe(false);
+  });
+});
+
 describe("URL", () => {
   it("splits an absolute URL into its parts", () => {
     const url = new URL("https://example.com/a/b?x=1#top");

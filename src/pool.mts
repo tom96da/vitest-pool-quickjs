@@ -10,6 +10,7 @@ import { Worker } from "node:worker_threads";
 import type { PoolOptions, PoolRunnerInitializer, PoolWorker, WorkerRequest } from "vitest/node";
 
 import { asset, buildWorker } from "./bundle.mts";
+import { knownExtensions } from "./extensions.mts";
 import type { Prepared, QuickJSPoolOptions, Report } from "./types.mts";
 import { decode, encode } from "./worker/codec.mts";
 
@@ -111,6 +112,16 @@ class QuickJSPoolWorker extends EventEmitter implements PoolWorker {
  * @returns the pool to assign to `test.pool`
  */
 export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitializer {
+  for (const name of options.extensions ?? []) {
+    if (!knownExtensions.includes(name)) {
+      throw new Error(
+        `unknown extension "${name}" in the extensions option. ` +
+          `it accepts ${knownExtensions.join(", ")}`,
+      );
+    }
+  }
+  // the pool decodes UTF-8 with the encoding extension
+  const extensions = [...new Set(["encoding", ...(options.extensions ?? [])])];
   // the build is the slow part, so it is kept for the root; the scripts are read at every start
   const builds = new Map<string, Promise<string>>();
   const prepared = async (root: string): Promise<Prepared> => {
@@ -119,7 +130,9 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
     }
     return {
       wasm: await compile("quickjs-wasi/quickjs.wasm"),
-      extensions: [{ name: "encoding", wasm: await compile("quickjs-wasi/encoding.so") }],
+      extensions: await Promise.all(
+        extensions.map(async (name) => ({ name, wasm: await compile(`quickjs-wasi/${name}.so`) })),
+      ),
       worker: await builds.get(root)!,
       preludes: await Promise.all(
         (options.preludes ?? []).map(async (file) => ({

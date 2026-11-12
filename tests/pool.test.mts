@@ -102,6 +102,29 @@ describe.concurrent("an import that externals does not list", () => {
   });
 });
 
+describe.concurrent("an extension that does not exist", () => {
+  let report: Report;
+  beforeAll(async () => {
+    report = await runFixture("fixture-unknown-extension");
+  });
+
+  it("stops the run with code 1", () => {
+    expect(report.code).toBe(1);
+  });
+
+  it("names the extension in its error", () => {
+    expect(report.stdout + report.stderr).toContain(
+      'unknown extension "nope" in the extensions option',
+    );
+  });
+
+  it("lists the valid extensions in its error", () => {
+    expect(report.stdout + report.stderr).toContain(
+      "it accepts url, encoding, headers, crypto, structured-clone",
+    );
+  });
+});
+
 describe.concurrent("console of the context", () => {
   let report: Report;
   beforeAll(async () => {
@@ -157,7 +180,8 @@ describe.concurrent("console of the context", () => {
 
 describe.concurrent("projects that pass", () => {
   it.each([
-    ["fixture-globals", "Tests  52 passed (52)"],
+    ["fixture-extensions", "Tests  5 passed (5)"],
+    ["fixture-globals", "Tests  55 passed (55)"],
     ["fixture-node-modules", "Tests  10 passed (10)"],
     ["fixture-options", "Tests  7 passed (7)"],
     ["fixture-prelude", "Tests  1 passed (1)"],

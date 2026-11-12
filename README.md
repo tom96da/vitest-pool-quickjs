@@ -36,18 +36,25 @@ export default defineConfig({
 
 ## Options
 
-| Option      | Description                                                                     |
-| ----------- | ------------------------------------------------------------------------------- |
-| `externals` | Specifiers of the packages and relative files that a test imports.              |
-| `preludes`  | Paths of scripts that run in the context before the tests, to define globals.   |
-| `modules`   | Source of `node:*` modules by id. It wins over the modules of the pool.         |
-| `plugins`   | Rolldown plugins that apply to the modules that the pool loads into the context. |
+| Option       | Description                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------- |
+| `externals`  | Specifiers of the packages and relative files that a test imports.                                 |
+| `preludes`   | Paths of scripts that run in the context before the tests, to define globals.                      |
+| `modules`    | Source of `node:*` modules by id. It wins over the modules of the pool.                            |
+| `plugins`    | Rolldown plugins that apply to the modules that the pool loads into the context.                   |
+| `extensions` | Extensions of quickjs-wasi to load: `url`, `encoding`, `headers`, `crypto` and `structured-clone`. |
 
 A test can import a package from `node_modules` or a relative file when `externals` lists it, for
 example:
 
 ```ts
 quickjsPool({ externals: ["pathe"] });
+```
+
+An extension defines globals of the web. List the ones to use, for example:
+
+```ts
+quickjsPool({ extensions: ["structured-clone", "crypto"] });
 ```
 
 ## Settings
@@ -61,7 +68,8 @@ quickjsPool({ externals: ["pathe"] });
 - With `isolate: false` one context holds the modules of every file.
 - A context has 1 GiB of memory.
 - Recursion deeper than about 1600 frames of a small function throws a `RangeError`.
-- The context has the globals of the web and of Node that Vitest reads, and no others.
+- The context has the globals of the web and of Node that Vitest reads and those of the extensions
+  that the option lists, and no others.
 - The console does not print `time`, `timeEnd` and `timeLog`.
 
 ## License

@@ -3,6 +3,8 @@
 
 import type { Plugin } from "rolldown";
 
+import type { Extension } from "./extensions.mts";
+
 /** Options of `quickjsPool()`. */
 export interface QuickJSPoolOptions {
   /**
@@ -19,12 +21,14 @@ export interface QuickJSPoolOptions {
   modules?: Record<string, string>;
   /** Rolldown plugins that apply to the modules the pool loads into the context. */
   plugins?: Plugin[];
+  /** Extensions of quickjs-wasi to load into the context. Each one defines globals of the web. */
+  extensions?: Extension[];
 }
 
 /** What a pool worker loads into a new context: the engine, the bundled worker and the scripts before it. */
 export interface Prepared {
   wasm: WebAssembly.Module;
-  /** The extensions of the engine, which give the context `TextEncoder` and `TextDecoder`. */
+  /** The extensions of the engine to load into the context. */
   extensions: { name: string; wasm: WebAssembly.Module }[];
   worker: string;
   preludes: { name: string; code: string }[];
