@@ -7,6 +7,11 @@ declare global {
   function __now(): number;
   /** Decodes bytes as UTF-8. A byte order mark stays in the result. */
   function __utf8(bytes: ArrayBuffer): string;
+  /**
+   * The rejections that no handler has seen, by promise. The thread writes an entry when a promise
+   * rejects without a handler and sets it to `undefined` when a handler arrives.
+   */
+  var __rejections: Record<string, { promise: Promise<unknown>; reason: unknown } | undefined>;
   /** Sends one encoded message to the pool. */
   function __post(text: string): void;
   /** Writes to the standard output of the process. */

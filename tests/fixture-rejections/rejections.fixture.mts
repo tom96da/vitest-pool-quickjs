@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { collect } from "../fixture-helpers.mts";
+import { collect, sleep } from "../fixture-helpers.mts";
 
 describe("unhandled rejections", () => {
   it("reports a rejection that nothing handles", async () => {
@@ -30,6 +30,43 @@ describe("unhandled rejections", () => {
       void Promise.resolve(1).then(() => {
         throw new Error("thrown in a then");
       });
+    });
+    expect(reported).toHaveLength(1);
+  });
+
+  it("reports the rejection of an async function that nothing awaits", async () => {
+    const reported = await collect("unhandledRejection", () => {
+      void (async () => {
+        throw new Error("thrown in an async function");
+      })();
+    });
+    expect(reported).toHaveLength(1);
+  });
+
+  it("reports the rejections in the order they happened", async () => {
+    const reported = await collect("unhandledRejection", () => {
+      for (const message of ["first", "second", "third"]) void Promise.reject(new Error(message));
+    });
+    expect(reported.map((reason) => (reason as Error).message)).toEqual([
+      "first",
+      "second",
+      "third",
+    ]);
+  });
+
+  it("gives a listener the rejected promise after the reason", async () => {
+    let received: unknown[] = [];
+    const listener = (...args: unknown[]) => (received = args);
+    process.on("unhandledRejection", listener);
+    const promise = Promise.reject(new Error("with a promise"));
+    await sleep(0);
+    process.off("unhandledRejection", listener);
+    expect(received[1]).toBe(promise);
+  });
+
+  it("reports a rejection that a promise executor creates", async () => {
+    const reported = await collect("unhandledRejection", () => {
+      void new Promise((_, reject) => reject(new Error("rejected in an executor")));
     });
     expect(reported).toHaveLength(1);
   });

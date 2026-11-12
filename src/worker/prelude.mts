@@ -296,39 +296,14 @@ if (!("URLSearchParams" in globalThis)) {
 }
 if (!("URL" in globalThis)) Object.assign(globalThis, { URL: InlineURL });
 
-// QuickJS reports no unhandled rejection to JS, so promises are watched through then and reject.
-// `await` skips then for a promise whose constructor is Promise. A watched promise has a
-// constructor of its own, so that `await` calls then and marks the promise as handled. The
-// rejection of an async function nobody awaits is not seen.
-{
-  const handled = new WeakSet<object>();
-  const rejected = new Map<object, unknown>();
-  const nativeThen = Reflect.get(Promise.prototype, "then") as Promise<unknown>["then"];
-  const nativeReject = Reflect.get(Promise, "reject") as (reason: unknown) => Promise<unknown>;
-  const awaitable = function WatchedPromise() {};
-  const watch = (promise: Promise<unknown>) => {
-    void Object.defineProperty(promise, "constructor", { value: awaitable, configurable: true });
-    void nativeThen.call(promise, undefined, (reason: unknown) => {
-      if (!handled.has(promise)) rejected.set(promise, reason);
-    });
-  };
-  Reflect.set(Promise.prototype, "then", function (this: Promise<unknown>, ok: never, bad: never) {
-    handled.add(this);
-    rejected.delete(this);
-    const next = nativeThen.call(this, ok, bad);
-    watch(next);
-    return next;
-  });
-  Promise.reject = function (this: unknown, reason: unknown) {
-    const promise = nativeReject.call(this, reason);
-    watch(promise);
-    return promise;
-  } as typeof Promise.reject;
-  Object.assign(globalThis, {
-    __flushRejections: () => {
-      const reasons = [...rejected.values()];
-      rejected.clear();
-      for (const reason of reasons) for (const f of raw("unhandledRejection")) f(reason);
-    },
-  });
-}
+// The thread records the rejections that nothing handles in __rejections. The pool calls this after
+// the pending jobs ran, so a handler that a job attaches in the same turn has removed its entry.
+Object.assign(globalThis, {
+  __flushRejections: () => {
+    for (const key of Object.keys(__rejections)) {
+      const entry = __rejections[key];
+      delete __rejections[key];
+      if (entry) for (const f of raw("unhandledRejection")) f(entry.reason, entry.promise);
+    }
+  },
+});

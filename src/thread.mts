@@ -41,7 +41,28 @@ function guest<T>(fn: () => T): T {
 }
 
 let vm: QuickJS;
+/** Where the context finds the rejections that nothing handles. */
+let rejections: JSValueHandle;
 let timer: NodeJS.Timeout | undefined;
+
+/**
+ * Records a promise that rejects without a handler, or removes it when a handler arrives. The
+ * entry lives in the context, because the handles of the engine end with the call.
+ * @param promise - the rejected promise
+ * @param reason - why it rejected
+ * @param handled - whether a handler was just attached
+ */
+function track(promise: JSValueHandle, reason: JSValueHandle, handled: boolean): void {
+  vm.withScope(() => {
+    // a key of digits only would sort by number, not by the order of the rejections
+    const key = `promise-${promise.identity}`;
+    if (handled) return vm.setProp(rejections, key, vm.undefined);
+    const entry = vm.newObject();
+    vm.setProp(entry, "promise", promise);
+    vm.setProp(entry, "reason", reason);
+    vm.setProp(rejections, key, entry);
+  });
+}
 
 /**
  * Defines a global function of string arguments in the context.
@@ -118,7 +139,9 @@ function pump(): void {
 
 try {
   const start = performance.now();
-  vm = await QuickJS.create({ wasm, memoryLimit, maxStackSize });
+  vm = await QuickJS.create({ wasm, memoryLimit, maxStackSize, onUnhandledRejection: track });
+  rejections = vm.newObject();
+  vm.setProp(vm.global, "__rejections", rejections);
   define("__stdout", (text) => report({ kind: "stdout", value: text }));
   define("__stderr", (text) => report({ kind: "stderr", value: text }));
   define("__post", (text) => report({ kind: "message", value: text }));
