@@ -3,7 +3,7 @@
 <!-- badges:start -->
 [![npm version](https://img.shields.io/npm/v/vitest-pool-quickjs)](https://npmjs.com/package/vitest-pool-quickjs)
 [![node version](https://img.shields.io/node/v/vitest-pool-quickjs)](https://nodejs.org/)
-[![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#scroll-license)
+[![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
 [![CI](https://github.com/tom96da/vitest-pool-quickjs/actions/workflows/ci.yml/badge.svg)](https://github.com/tom96da/vitest-pool-quickjs/actions/workflows/ci.yml)
 <!-- badges:end -->
 
@@ -63,3 +63,7 @@ quickjsPool({ externals: ["pathe"] });
 - Recursion deeper than about 1600 frames of a small function throws a `RangeError`.
 - The context has the globals of the web and of Node that Vitest reads, and no others.
 - The console does not print `time`, `timeEnd` and `timeLog`.
+
+## License
+
+Dual-licensed under [MIT](./LICENSE-MIT) or [Apache 2.0](./LICENSE-APACHE).
