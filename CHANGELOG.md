@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- the report of a failed test names the error and points at the line of the source ([1b9fe77](https://github.com/tom96da/vitest-pool-quickjs/commit/1b9fe77))
+
 ## [0.2.2] - 2026-11-13
 
 ### Added
