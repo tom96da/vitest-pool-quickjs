@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-13
+
 ### Fixed
 
 - the report of a failed test names the error and points at the line of the source ([1b9fe77](https://github.com/tom96da/vitest-pool-quickjs/commit/1b9fe77))
@@ -68,7 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - automatically provide missing Web and Node.js globals
 - easily integrate by adding it to your config file
 
-[Unreleased]: https://github.com/tom96da/vitest-pool-quickjs/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/tom96da/vitest-pool-quickjs/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.3
 [0.2.2]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.2
 [0.2.1]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.1
 [0.2.0]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.0
