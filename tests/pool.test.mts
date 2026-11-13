@@ -284,6 +284,17 @@ describe("fixture-filter", () => {
   });
 });
 
+describe("two contexts that start from one snapshot", () => {
+  it("do not share what a file left behind, and repeat what the scripts wrote", async () => {
+    // one worker, so that the second file restores the context of the first
+    const { code, stdout } = await runFixture("fixture-restore", ["--maxWorkers=1"]);
+    expect(stdout).toContain("Tests  6 passed (6)");
+    expect(code).toBe(0);
+    // what a script writes while it loads comes once for each file, as without a snapshot
+    expect(stdout.match(/prelude-output/g)).toHaveLength(2);
+  });
+});
+
 describe("two test files", () => {
   it("run at the same time", async () => {
     const { code, stdout } = await runFixture("fixture-parallel");

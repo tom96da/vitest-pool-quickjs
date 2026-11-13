@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 import type { EventEmitter } from "node:events";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
 
@@ -221,5 +223,145 @@ describe("the error event of a started thread", () => {
     worker.send({ type: "stop" } as WorkerRequest);
     expect(postMessage).not.toHaveBeenCalled();
     await worker.stop();
+  });
+});
+
+describe("a worker that starts again after its prelude changed", () => {
+  it("runs the prelude as it is now", async () => {
+    const file = path.join(await mkdtemp(path.join(tmpdir(), "prelude-")), "prelude.js");
+    const pool = quickjsPool({ preludes: [file] });
+    const stdout = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    try {
+      const written: string[] = [];
+      for (const version of ["first", "second"]) {
+        await writeFile(file, `__stdout("prelude ${version}\\n");`);
+        const worker = pool.createPoolWorker({
+          project: { config: { root, fsModuleCache: false } },
+          env: {},
+        } as never);
+        await worker.start();
+        await worker.stop();
+        written.push(...stdout.mock.calls.map(([text]) => String(text)));
+        stdout.mockClear();
+      }
+      expect(written).toEqual(["prelude first\n", "prelude second\n"]);
+    } finally {
+      stdout.mockRestore();
+    }
+  });
+});
+
+describe("the snapshot option", () => {
+  /**
+   * Starts two workers of one pool whose prelude writes the time, and reads what each one wrote.
+   * @param snapshot - the option of the pool
+   * @returns the text that the prelude wrote for the first and for the second worker
+   */
+  async function twoStarts(snapshot: boolean | undefined) {
+    const file = path.join(await mkdtemp(path.join(tmpdir(), "prelude-")), "prelude.js");
+    await writeFile(file, '__stdout("at " + Date.now() + "\\n");');
+    const pool = quickjsPool({ preludes: [file], snapshot });
+    const stdout = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    try {
+      const written: string[] = [];
+      for (let i = 0; i < 2; i++) {
+        const worker = pool.createPoolWorker({
+          project: { config: { root, fsModuleCache: false } },
+          env: {},
+        } as never);
+        await worker.start();
+        await worker.stop();
+        written.push(stdout.mock.calls.map(([text]) => String(text)).join(""));
+        stdout.mockClear();
+        // a moment that the clock can tell from the first
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      return written;
+    } finally {
+      stdout.mockRestore();
+    }
+  }
+
+  it("repeats the output of the first start by default", async () => {
+    const [first, second] = await twoStarts(undefined);
+    expect(first).toMatch(/^at \d+\n$/);
+    expect(second).toBe(first);
+  });
+
+  it("runs the scripts again for each start when it is false", async () => {
+    const [first, second] = await twoStarts(false);
+    expect(second).toMatch(/^at \d+\n$/);
+    expect(second).not.toBe(first);
+  });
+});
+
+describe("the snapshot after a start that ended early", () => {
+  /**
+   * Starts and stops a worker of the pool.
+   * @param pool - the pool
+   * @param env - the environment that vitest gives the worker
+   * @returns what the prelude wrote
+   */
+  async function once(pool: ReturnType<typeof quickjsPool>, env: Record<string, string> = {}) {
+    const stdout = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    try {
+      const worker = pool.createPoolWorker({
+        project: { config: { root, fsModuleCache: false } },
+        env,
+      } as never);
+      await worker.start();
+      await worker.stop();
+      return stdout.mock.calls.map(([text]) => String(text)).join("");
+    } finally {
+      stdout.mockRestore();
+    }
+  }
+
+  /**
+   * Writes a prelude that reports the time and the variable A of its environment.
+   * @returns the path of the prelude
+   */
+  async function prelude() {
+    const file = path.join(await mkdtemp(path.join(tmpdir(), "prelude-")), "prelude.js");
+    await writeFile(file, '__stdout("at " + Date.now() + " A=" + __env.A + "\\n");');
+    return file;
+  }
+
+  it.each(["boots", "prepares"])(
+    "is taken by the next start after one stopped while it %s",
+    async (when) => {
+      const pool = quickjsPool({ preludes: [await prelude()] });
+      const first = pool.createPoolWorker({
+        project: { config: { root, fsModuleCache: false } },
+        env: {},
+      } as never) as unknown as { thread?: Worker; start(): Promise<void>; stop(): Promise<void> };
+      const start = first.start().catch(() => {});
+      if (when === "boots") {
+        await vi.waitFor(() => {
+          if (!first.thread) throw new Error("the worker has not started its thread");
+        });
+      }
+      await first.stop();
+      await start;
+      const second = await once(pool);
+      // a moment that the clock can tell from the second start
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(await once(pool)).toBe(second);
+    },
+  );
+
+  it("keeps one snapshot for each environment", async () => {
+    const pool = quickjsPool({ preludes: [await prelude()] });
+    const [first, other] = [await once(pool, { A: "1" }), await once(pool, { A: "2" })];
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(first).toMatch(/ A=1\n$/);
+    expect(other).toMatch(/ A=2\n$/);
+    expect(await once(pool, { A: "1" })).toBe(first);
+  });
+
+  it("refuses a snapshot option that is not a boolean", () => {
+    expect(() => quickjsPool({ snapshot: "false" as never })).toThrow(
+      'the snapshot option takes true or false, not "false"',
+    );
   });
 });

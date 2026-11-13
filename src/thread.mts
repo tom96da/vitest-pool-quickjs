@@ -8,7 +8,7 @@ import { parentPort, workerData } from "node:worker_threads";
 import { JSException, QuickJS } from "quickjs-wasi";
 import type { JSValueHandle } from "quickjs-wasi";
 
-import type { Prepared, Report } from "./types.mts";
+import type { ContextSnapshot, Prepared, Report } from "./types.mts";
 
 /** The memory limit of one context. */
 const memoryLimit = 1024 * 1024 * 1024;
@@ -17,13 +17,19 @@ const memoryLimit = 1024 * 1024 * 1024;
 const maxStackSize = 393216;
 
 const port = parentPort!;
-const { wasm, extensions, worker, preludes, env }: Prepared = workerData;
+const { wasm, extensions, worker, preludes, env, snapshot, takeSnapshot }: Prepared = workerData;
 
 /**
  * Sends a report to the pool.
  * @param message - what the thread reports
  */
-const report = (message: Report): void => port.postMessage(message);
+const report = (message: Report): void => {
+  if (booting && (message.kind === "stdout" || message.kind === "stderr")) booting.push(message);
+  port.postMessage(message);
+};
+
+/** What the scripts write while the context boots, kept for the snapshot. */
+let booting: ContextSnapshot["output"] | undefined = takeSnapshot ? [] : undefined;
 
 /**
  * Runs a call into the context and turns the exception of the context into an error that
@@ -165,16 +171,19 @@ function pump(): void {
 }
 
 try {
-  const start = performance.now();
-  vm = await QuickJS.create({
-    wasm,
-    extensions,
-    memoryLimit,
-    maxStackSize,
-    onUnhandledRejection: track,
-  });
-  rejections = vm.newObject();
-  vm.setProp(vm.global, "__rejections", rejections);
+  // the clock of a restored context goes on from where the snapshot was taken, so that a time
+  // that a script noted while it loaded is never ahead of the time of a test
+  const start = performance.now() - (snapshot?.clock ?? 0);
+  const options = { wasm, extensions, memoryLimit, maxStackSize, onUnhandledRejection: track };
+  vm = snapshot
+    ? await QuickJS.restore({ ...snapshot, memory: new Uint8Array(snapshot.memory) }, options)
+    : await QuickJS.create(options);
+  if (snapshot) rejections = vm.global.getProp("__rejections");
+  else {
+    rejections = vm.newObject();
+    vm.setProp(vm.global, "__rejections", rejections);
+  }
+  // the functions of a restored context are found again by their names
   define("__stdout", (text) => report({ kind: "stdout", value: text }));
   define("__stderr", (text) => report({ kind: "stderr", value: text }));
   define("__post", (text) => report({ kind: "message", value: text }));
@@ -196,10 +205,26 @@ try {
   const now = vm.newFunction("__now", () => vm.newNumber(performance.now() - start));
   vm.setProp(vm.global, "__now", now);
   now.dispose();
-  // the prelude of the pool takes it into `process.env`
-  run(`globalThis.__env = ${JSON.stringify(env)};`, "env.js");
-  for (const prelude of preludes) run(prelude.code, prelude.name);
-  run(worker, "worker.js");
+  if (snapshot) {
+    for (const line of snapshot.output) report(line);
+    // the time origin is the one of this thread
+    run("performance.timeOrigin = Date.now() - __now();", "restore.js");
+  } else {
+    run(`globalThis.__env = ${JSON.stringify(env)};`, "env.js");
+    for (const prelude of preludes) run(prelude.code, prelude.name);
+    run(worker, "worker.js");
+  }
+  if (takeSnapshot) {
+    drain();
+    const taken = vm.snapshot();
+    const memory = new SharedArrayBuffer(taken.memory.byteLength);
+    new Uint8Array(memory).set(taken.memory);
+    report({
+      kind: "snapshot",
+      value: { ...taken, memory, clock: performance.now() - start, output: booting! },
+    });
+    booting = undefined;
+  }
   port.on("message", (text: string) => {
     try {
       call("__onMessage", text);

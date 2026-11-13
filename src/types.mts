@@ -1,6 +1,7 @@
 // Copyright (c) 2026 tom96da
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+import type { Snapshot } from "quickjs-wasi";
 import type { Plugin } from "rolldown";
 
 import type { Extension } from "./extensions.mts";
@@ -23,7 +24,32 @@ export interface QuickJSPoolOptions {
   plugins?: Plugin[];
   /** Extensions of quickjs-wasi to load into the context. Each one defines globals of the web. */
   extensions?: Extension[];
+  /**
+   * Whether the pool saves the context of the first test file as a snapshot right after its setup,
+   * and starts the other test files from that snapshot. Their setup is skipped, so each file starts
+   * sooner.
+   *
+   * The setup loads Vitest, the scripts of `preludes` and the packages of `externals`. With the
+   * snapshot, a value that they make while they load, such as a random id or the time, is the same
+   * in every test file, and so is the sequence of `Math.random()`. Set `false` to run the setup for
+   * each test file.
+   *
+   * @default true
+   */
+  snapshot?: boolean;
 }
+
+/**
+ * A context after the preludes and the worker bundle ran. A thread that restores it skips them. Its
+ * memory is shared with the threads, which copy it.
+ */
+export type ContextSnapshot = Omit<Snapshot, "memory"> & {
+  memory: SharedArrayBuffer;
+  /** The milliseconds on the clock of the context when the snapshot was taken. */
+  clock: number;
+  /** What the scripts wrote to the output while they loaded, which every restored thread repeats. */
+  output: Extract<Report, { kind: "stdout" | "stderr" }>[];
+};
 
 /** What a pool worker loads into a new context: the engine, the bundled worker and the scripts before it. */
 export interface Prepared {
@@ -34,6 +60,10 @@ export interface Prepared {
   preludes: { name: string; code: string }[];
   /** The environment variables that vitest resolves for the worker. */
   env: Record<string, string>;
+  /** The context to restore, when there is one. */
+  snapshot?: ContextSnapshot;
+  /** The thread reports a snapshot of its context after it booted. */
+  takeSnapshot?: boolean;
 }
 
 /** What a pool thread reports to the main thread. */
@@ -43,4 +73,5 @@ export type Report =
   | { kind: "error"; value: unknown }
   | { kind: "message"; value: string }
   | { kind: "stdout"; value: string }
-  | { kind: "stderr"; value: string };
+  | { kind: "stderr"; value: string }
+  | { kind: "snapshot"; value: ContextSnapshot };

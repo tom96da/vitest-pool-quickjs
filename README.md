@@ -43,6 +43,7 @@ export default defineConfig({
 | `modules`    | Source of `node:*` modules by id. It wins over the modules of the pool.                            |
 | `plugins`    | Rolldown plugins that apply to the modules that the pool loads into the context.                   |
 | `extensions` | Extensions of quickjs-wasi to load: `url`, `encoding`, `headers`, `crypto` and `structured-clone`. |
+| `snapshot`   | Start the test files from a snapshot of the first one to skip their setup. The default is `true`.  |
 
 A test can import a package from `node_modules` or a relative file when `externals` lists it, for
 example:
@@ -72,6 +73,9 @@ quickjsPool({ extensions: ["structured-clone", "crypto"] });
   that the option lists, and no others.
 - The console does not print `time`, `timeEnd` and `timeLog`.
 - A method in a stack trace shows as `m` where V8 shows `Class.m`.
+- With `snapshot` on, a value that a script or a package makes while it loads, such as a random id
+  or the time, is the same in every test file, and so is the sequence of `Math.random()`. Set
+  `snapshot: false` to make them in each file.
 - Two `vi.mock` factories that each await `vi.importActual` of a module that imports the other wait
   for each other. The run stops without output while the test file loads. Exclude that file with
   the `exclude` option, and give the job of the CI a timeout.
