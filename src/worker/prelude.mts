@@ -71,12 +71,46 @@ Object.assign(globalThis, {
   Event: class {},
 });
 if (!("console" in globalThis)) Object.assign(globalThis, { console: {} });
-// vitest swaps Error.prepareStackTrace, a V8 hook. QuickJS builds `stack` itself and loses it then.
-Object.defineProperty(Error, "prepareStackTrace", {
-  get: () => undefined,
-  set() {},
-  configurable: true,
-});
+
+// The module runner of Vite sets Error.prepareStackTrace to name the error and map the positions to
+// the source. QuickJS calls the hook with call sites that lack some methods it uses, and an error in
+// the hook leaves the error without a stack. The methods below fill the gap.
+{
+  const engine = Error as { prepareStackTrace?: (error: Error, sites: object[]) => string };
+  let site: object | undefined;
+  // the call sites share one prototype, which a throwaway error shows
+  engine.prepareStackTrace = (_error, sites) => ((site = Object.getPrototypeOf(sites[0]!)), "");
+  void new Error().stack;
+  engine.prepareStackTrace = undefined;
+  Object.assign(site!, {
+    // the file name is the only name of a script that the engine knows
+    getScriptNameOrSourceURL(this: { getFileName(): string | null }) {
+      return this.getFileName();
+    },
+    // the engine does not mark code from eval, so the hook never asks for its origin
+    isEval: () => false,
+    // the engine does not tell the receiver of a call, so a method shows as `m` where V8 shows `Class.m`
+    isToplevel: () => true,
+    // the hook returns a call site that it could not map as it is, and joins it as text
+    toString(this: {
+      isNative(): boolean;
+      isConstructor(): boolean;
+      getFileName(): string | null;
+      getFunctionName(): string | null;
+      getLineNumber(): number | null;
+      getColumnNumber(): number | null;
+    }) {
+      const line = this.getLineNumber();
+      const column = this.getColumnNumber();
+      const file = this.isNative()
+        ? "native"
+        : `${this.getFileName() ?? "<anonymous>"}${line == null ? "" : `:${line}${column ? `:${column}` : ""}`}`;
+      const name = this.getFunctionName();
+      if (this.isConstructor()) return `new ${name || "<anonymous>"} (${file})`;
+      return name ? `${name} (${file})` : file;
+    },
+  });
+}
 
 // Real timers: the pool sleeps until __timerDelay() and then calls __fireTimers().
 {

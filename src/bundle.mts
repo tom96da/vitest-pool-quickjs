@@ -139,6 +139,35 @@ const externalImport: Plugin = {
   },
 };
 
+/** The hook that the helper of vitest sets to read the stack of a new error without a source map. */
+const stackHook = "Error.prepareStackTrace = (e) => e.stack;";
+
+/**
+ * Makes the plugin that turns that hook off. QuickJS has no `stack` yet while the hook runs, so the
+ * hook returns nothing, and vitest finds no caller for `vi.mock`. Without the hook, the engine
+ * gives the plain stack.
+ * @returns the plugin
+ */
+function plainStack(): Plugin {
+  let replaced = false;
+  return {
+    name: "vitest-pool-quickjs:plain-stack",
+    transform(code) {
+      if (!code.includes(stackHook)) return null;
+      replaced = true;
+      return code.replaceAll(stackHook, "Error.prepareStackTrace = undefined;");
+    },
+    buildEnd() {
+      if (!replaced) {
+        this.error(
+          "vitest changed how it reads the plain stack. " +
+            "use a version of vitest that this package supports",
+        );
+      }
+    },
+  };
+}
+
 /**
  * Bundles the worker into one script for a QuickJS context.
  * @param root - the directory that the `externals` resolve from
@@ -166,6 +195,7 @@ export async function buildWorker(
       externalModules(externals, root),
       nodeModules(modules, shims),
       externalImport,
+      plainStack(),
       ...plugins,
     ],
   });

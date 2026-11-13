@@ -56,11 +56,16 @@ describe.concurrent("a failing run", () => {
 
   it("exits with code 1 when a test fails", () => {
     expect(report.code).toBe(1);
-    expect(report.stdout).toContain("Tests  1 failed | 4 passed (5)");
+    expect(report.stdout).toContain("Tests  2 failed | 4 passed (6)");
   });
 
   it("reports the diff of a failed assertion", () => {
     expect(report.stderr).toContain("expected { a: 1 } to deeply equal { a: 2 }");
+  });
+
+  it("names the error and the line of the source that threw it", () => {
+    expect(report.stderr).toContain("RangeError: message of the thrown error");
+    expect(report.stderr).toContain("failing.fixture.mts:34:17");
   });
 
   it("writes console.log of the context to stdout", () => {
@@ -241,6 +246,7 @@ describe.concurrent("projects that pass", () => {
   it.each([
     ["fixture-extensions", "Tests  5 passed (5)"],
     ["fixture-globals", "Tests  55 passed (55)"],
+    ["fixture-mock", "Tests  1 passed (1)"],
     ["fixture-node-modules", "Tests  10 passed (10)"],
     ["fixture-options", "Tests  7 passed (7)"],
     ["fixture-prelude", "Tests  1 passed (1)"],

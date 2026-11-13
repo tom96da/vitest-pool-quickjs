@@ -28,4 +28,11 @@ describe("reports of the context", () => {
     console.error("error from the context");
     expect(error).toHaveBeenCalledOnce();
   });
+
+  it("fails with a thrown error", () => {
+    const thrower = () => {
+      throw new RangeError("message of the thrown error");
+    };
+    expect(thrower()).toBeUndefined();
+  });
 });
