@@ -132,7 +132,7 @@ jobs:
         run: pnpm exec oxfmt --check
 
       - name: Type check
-        run: pnpm exec tsc --noEmit
+        run: pnpm exec tsc -b --noEmit
 
   passed:
     name: CI Passed
