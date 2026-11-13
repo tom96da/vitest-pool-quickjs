@@ -1,0 +1,4 @@
+[submodule "vitest"]
+	path = vitest
+	url = https://github.com/vitest-dev/vitest.git
+	shallow = true
