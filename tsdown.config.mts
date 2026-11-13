@@ -8,7 +8,7 @@ export default defineConfig([
     entry: { index: "src/index.mts" },
     deps: {
       onlyBundle: ["ts-dedent"],
-      onlyImport: ["rolldown", "vitest"],
+      onlyImport: ["quickjs-wasi", "rolldown", "vitest"],
     },
     format: "esm",
     fixedExtension: false,
