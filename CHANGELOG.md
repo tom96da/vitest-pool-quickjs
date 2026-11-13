@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-14
+
 ### Added
 
 - the `snapshot` option starts each test file from a snapshot of the first one, which skips its setup ([1a103d5](https://github.com/tom96da/vitest-pool-quickjs/commit/1a103d5))
@@ -82,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - automatically provide missing Web and Node.js globals
 - easily integrate by adding it to your config file
 
-[Unreleased]: https://github.com/tom96da/vitest-pool-quickjs/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/tom96da/vitest-pool-quickjs/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.4
 [0.2.3]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.3
 [0.2.2]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.2
 [0.2.1]: https://github.com/tom96da/vitest-pool-quickjs/releases/tag/v0.2.1

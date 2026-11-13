@@ -1,6 +1,6 @@
 {
   "name": "vitest-pool-quickjs",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "A Vitest pool that runs test files in QuickJS.",
   "keywords": [
     "quickjs",
