@@ -20,6 +20,7 @@ const root = path.resolve(import.meta.dirname, "fixture-filter");
 async function started() {
   const worker = quickjsPool().createPoolWorker({
     project: { config: { root, fsModuleCache: false } },
+    env: {},
   } as never);
   const errors: unknown[] = [];
   worker.on("error", (error: unknown) => errors.push(error));
@@ -57,7 +58,10 @@ describe("the error event of a pump", () => {
   it("carries the error of the timer delay", async () => {
     const worker = quickjsPool({
       preludes: [path.resolve(import.meta.dirname, "delay-throwing-prelude.js")],
-    }).createPoolWorker({ project: { config: { root, fsModuleCache: false } } } as never);
+    }).createPoolWorker({
+      project: { config: { root, fsModuleCache: false } },
+      env: {},
+    } as never);
     const errors: unknown[] = [];
     worker.on("error", (error: unknown) => errors.push(error));
     await worker.start();
@@ -72,7 +76,10 @@ describe("a worker whose start throws", () => {
   it("stays inert after a start that threw", async () => {
     const worker = quickjsPool({
       preludes: [path.resolve(import.meta.dirname, "throwing-prelude.js")],
-    }).createPoolWorker({ project: { config: { root, fsModuleCache: false } } } as never);
+    }).createPoolWorker({
+      project: { config: { root, fsModuleCache: false } },
+      env: {},
+    } as never);
     const errors: unknown[] = [];
     worker.on("error", (error: unknown) => errors.push(error));
     await expect(worker.start()).rejects.toThrow("prelude failed");
@@ -91,6 +98,7 @@ describe("a worker that ends", () => {
   const make = () =>
     quickjsPool().createPoolWorker({
       project: { config: { root, fsModuleCache: false } },
+      env: {},
     } as never) as unknown as EventEmitter & {
       thread?: Worker;
       start(): Promise<void>;
@@ -140,6 +148,7 @@ describe("stop", () => {
   it("is safe on a worker that was never started", async () => {
     const worker = quickjsPool().createPoolWorker({
       project: { config: { root, fsModuleCache: false } },
+      env: {},
     } as never);
     await expect(worker.stop()).resolves.toBeUndefined();
   });

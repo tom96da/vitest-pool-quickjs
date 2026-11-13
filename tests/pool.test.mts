@@ -250,7 +250,7 @@ describe.concurrent("projects that pass", () => {
     ["fixture-node-modules", "Tests  10 passed (10)"],
     ["fixture-options", "Tests  7 passed (7)"],
     ["fixture-prelude", "Tests  1 passed (1)"],
-    ["fixture-process", "Tests  7 passed (7)"],
+    ["fixture-process", "Tests  8 passed (8)"],
     ["fixture-promise-matchers", "Tests  3 passed (3)"],
     ["fixture-rejections", "Tests  11 passed (11)"],
     ["fixture-text-decoder", "Tests  23 passed (23)"],

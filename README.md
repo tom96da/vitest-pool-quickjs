@@ -72,6 +72,9 @@ quickjsPool({ extensions: ["structured-clone", "crypto"] });
   that the option lists, and no others.
 - The console does not print `time`, `timeEnd` and `timeLog`.
 - A method in a stack trace shows as `m` where V8 shows `Class.m`.
+- Two `vi.mock` factories that each await `vi.importActual` of a module that imports the other wait
+  for each other. The run stops without output while the test file loads. Exclude that file with
+  the `exclude` option, and give the job of the CI a timeout.
 - An inline snapshot is compared but never written into the test file, so a new or an outdated one
   fails the run. Use `toMatchSnapshot` or `toMatchFileSnapshot` to write one.
 

@@ -17,7 +17,7 @@ const memoryLimit = 1024 * 1024 * 1024;
 const maxStackSize = 393216;
 
 const port = parentPort!;
-const { wasm, extensions, worker, preludes }: Prepared = workerData;
+const { wasm, extensions, worker, preludes, env }: Prepared = workerData;
 
 /**
  * Sends a report to the pool.
@@ -196,6 +196,8 @@ try {
   const now = vm.newFunction("__now", () => vm.newNumber(performance.now() - start));
   vm.setProp(vm.global, "__now", now);
   now.dispose();
+  // the prelude of the pool takes it into `process.env`
+  run(`globalThis.__env = ${JSON.stringify(env)};`, "env.js");
   for (const prelude of preludes) run(prelude.code, prelude.name);
   run(worker, "worker.js");
   port.on("message", (text: string) => {

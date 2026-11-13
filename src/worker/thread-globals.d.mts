@@ -29,6 +29,8 @@ declare global {
   function __writeFile(file: string, text: string): Promise<void>;
   /** Removes a file, if there is one. */
   function __removeFile(file: string): Promise<void>;
+  /** The environment variables of the worker. The prelude takes them and removes the global. */
+  var __env: Record<string, string> | undefined;
   /** The result of the last `__evalFile` call. */
   var __evalResult: unknown;
   /** Receives one encoded message from the pool. The worker defines it. */

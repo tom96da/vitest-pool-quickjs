@@ -32,6 +32,8 @@ export interface Prepared {
   extensions: { name: string; wasm: WebAssembly.Module }[];
   worker: string;
   preludes: { name: string; code: string }[];
+  /** The environment variables that vitest resolves for the worker. */
+  env: Record<string, string>;
 }
 
 /** What a pool thread reports to the main thread. */

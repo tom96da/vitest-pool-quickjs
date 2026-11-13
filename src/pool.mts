@@ -124,7 +124,10 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
   const extensions = [...new Set(["encoding", ...(options.extensions ?? [])])];
   // the build is the slow part, so it is kept for the root; the scripts are read at every start
   const builds = new Map<string, Promise<string>>();
-  const prepared = async (root: string): Promise<Prepared> => {
+  const prepared = async (
+    root: string,
+    env: Record<string, string | undefined>,
+  ): Promise<Prepared> => {
     if (!builds.has(root)) {
       builds.set(root, buildWorker(root, options));
     }
@@ -134,6 +137,9 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
         extensions.map(async (name) => ({ name, wasm: await compile(`quickjs-wasi/${name}.so`) })),
       ),
       worker: await builds.get(root)!,
+      env: Object.fromEntries(
+        Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+      ),
       preludes: await Promise.all(
         (options.preludes ?? []).map(async (file) => ({
           name: file,
@@ -154,7 +160,7 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
             "set `fsModuleCache: false` in the test options of the config",
         );
       }
-      return new QuickJSPoolWorker(() => prepared(config.root));
+      return new QuickJSPoolWorker(() => prepared(config.root, poolOptions.env));
     },
   };
 }

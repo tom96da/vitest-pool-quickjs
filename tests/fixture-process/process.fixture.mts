@@ -61,3 +61,12 @@ describe("process listeners", () => {
     expect(process.listeners("fixture-b")).toHaveLength(1);
   });
 });
+
+describe("process.env", () => {
+  it("has the variables that vitest sets for a worker", () => {
+    expect(process.env.NODE_ENV).toBe("test");
+    expect(process.env.VITEST).toBe("true");
+    expect(process.env.TEST).toBe("true");
+    expect(process.env.VITEST_MODE).toBe("RUN");
+  });
+});

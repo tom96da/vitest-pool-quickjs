@@ -31,9 +31,12 @@ const once = (name: string, f: ProcessListener): typeof process => {
   );
   return on(name, wrapper);
 };
+// the environment that vitest resolves for the worker: TEST, VITEST, NODE_ENV and more
+const env: Record<string, string> = { ...globalThis.__env };
+Reflect.deleteProperty(globalThis, "__env");
 /** The `process` of the context. */
 const proc: typeof process = {
-  env: {},
+  env,
   argv: [],
   platform: "quickjs",
   versions: {},
