@@ -12,9 +12,9 @@ A [Vitest](https://vitest.dev/) pool that runs test files in [QuickJS](https://q
 
 ## How it works
 
-The worker of Vitest runs in a QuickJS context without changes. The pool gives it the globals and
-Node modules that QuickJS lacks, so `describe`, `expect`, `vi.mock`, fake timers and the reporters
-are the ones of Vitest.
+The pool runs the worker of Vitest in a QuickJS context and gives it the globals and Node modules
+that QuickJS lacks, so `describe`, `expect`, `vi.mock`, fake timers and the reporters are the ones
+of Vitest.
 
 Powered by [quickjs-wasi](https://github.com/vercel-labs/quickjs-wasi).
 
@@ -71,6 +71,7 @@ quickjsPool({ extensions: ["structured-clone", "crypto"] });
 - The context has the globals of the web and of Node that Vitest reads and those of the extensions
   that the option lists, and no others.
 - The console does not print `time`, `timeEnd` and `timeLog`.
+- A method in a stack trace shows as `m` where V8 shows `Class.m`.
 - An inline snapshot is compared but never written into the test file, so a new or an outdated one
   fails the run. Use `toMatchSnapshot` or `toMatchFileSnapshot` to write one.
 
