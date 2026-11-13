@@ -4,6 +4,7 @@
 import { defineConfig } from "oxlint";
 
 export default defineConfig({
+  ignorePatterns: ["vitest/**"],
   plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "node", "jsdoc", "vitest"],
   rules: {
     "import/consistent-type-specifier-style": "error",

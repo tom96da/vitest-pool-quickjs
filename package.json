@@ -37,8 +37,8 @@
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
-    "lint": "oxlint --type-aware",
-    "format": "oxfmt --check .",
+    "lint": "oxlint --type-aware --disable-nested-config",
+    "format": "oxfmt --check --disable-nested-config .",
     "typecheck": "tsc -b --noEmit",
     "prepack": "clear-package-json package.json -o package.json"
   },
