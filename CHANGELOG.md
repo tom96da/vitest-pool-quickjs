@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `process.env` has the variables that Vitest sets for a worker, such as `NODE_ENV`, `VITEST` and `TEST` ([95ffe13](https://github.com/tom96da/vitest-pool-quickjs/commit/95ffe13))
+
 ## [0.2.3] - 2026-11-13
 
 ### Fixed
