@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- the `snapshot` option starts each test file from a snapshot of the first one, which skips its setup ([1a103d5](https://github.com/tom96da/vitest-pool-quickjs/commit/1a103d5))
+
+### Changed
+
+- with the snapshot, values made at load time and `Math.random()` are the same in every file ([1a103d5](https://github.com/tom96da/vitest-pool-quickjs/commit/1a103d5))
+
 ### Fixed
 
 - `process.env` has the variables that Vitest sets for a worker, such as `NODE_ENV`, `VITEST` and `TEST` ([95ffe13](https://github.com/tom96da/vitest-pool-quickjs/commit/95ffe13))
