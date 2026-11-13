@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["src/*.mts", "src/worker/codec.mts", "tests/*.mts", "types/node-*.d.mts", "*.mts"],
+  "exclude": ["src/worker.mts"]
+}

@@ -4,49 +4,24 @@
 // The globals that vitest reads while it loads and that QuickJS lacks. This module runs first in
 // the worker bundle.
 
-/** A listener of a process event. */
-type Listener = (...args: unknown[]) => void;
-
 /** The listener that `once` registers. It holds the listener it wraps. */
-type Wrapper = Listener & { listener: Listener };
-
-/** The members of `process` that vitest reads. */
-interface Process {
-  env: Record<string, string>;
-  argv: string[];
-  platform: string;
-  versions: Record<string, string>;
-  cwd(): string;
-  nextTick(f: () => void): void;
-  emitWarning(): void;
-  listeners(name: string): Listener[];
-  on(name: string, f: Listener): Process;
-  once(name: string, f: Listener): Process;
-  off(name: string, f: Listener): Process;
-  removeListener(name: string, f: Listener): Process;
-  removeAllListeners(name?: string): Process;
-  memoryUsage(): { heapUsed: number };
-  exit(): never;
-  hrtime: { (): [number, number]; bigint(): bigint };
-  stdout: { write(text: string, callback?: () => void): boolean };
-  stderr: { write(text: string, callback?: () => void): boolean };
-}
+type Wrapper = ProcessListener & { listener: ProcessListener };
 
 /** The listeners of `process`, by event name. */
-const listeners = new Map<string, Listener[]>();
+const listeners = new Map<string, ProcessListener[]>();
 const raw = (name: string) => listeners.get(name) ?? [];
-const on = (name: string, f: Listener): Process => {
+const on = (name: string, f: ProcessListener): typeof process => {
   listeners.set(name, [...(listeners.get(name) ?? []), f]);
   return proc;
 };
-const off = (name: string, f: Listener): Process => {
+const off = (name: string, f: ProcessListener): typeof process => {
   listeners.set(
     name,
     (listeners.get(name) ?? []).filter((x) => x !== f && (x as Wrapper).listener !== f),
   );
   return proc;
 };
-const once = (name: string, f: Listener): Process => {
+const once = (name: string, f: ProcessListener): typeof process => {
   const wrapper: Wrapper = Object.assign(
     (...args: unknown[]) => {
       off(name, wrapper);
@@ -57,7 +32,7 @@ const once = (name: string, f: Listener): Process => {
   return on(name, wrapper);
 };
 /** The `process` of the context. */
-const proc: Process = {
+const proc: typeof process = {
   env: {},
   argv: [],
   platform: "quickjs",
@@ -157,11 +132,11 @@ Object.defineProperty(Error, "prepareStackTrace", {
 }
 
 /** The signal of an `AbortController`. */
-class InlineAbortSignal {
+class InlineAbortSignal implements AbortSignal {
   aborted = false;
   reason: unknown;
-  handlers: ((e: { type: string }) => void)[] = [];
-  addEventListener(type: string, f: (e: { type: string }) => void) {
+  handlers: AbortListener[] = [];
+  addEventListener(type: string, f: AbortListener) {
     if (type === "abort") this.handlers.push(f);
   }
   removeEventListener(_type: string, f: unknown) {
@@ -173,7 +148,7 @@ class InlineAbortSignal {
 }
 
 /** An `AbortController` for the context, which has none. */
-class InlineAbortController {
+class InlineAbortController implements InstanceType<typeof AbortController> {
   signal = new InlineAbortSignal();
   abort(reason: unknown = new Error("aborted")) {
     const s = this.signal;
@@ -210,7 +185,7 @@ const encode = (text: string) =>
  * The `URLSearchParams` of the context, which has none. It parses and writes plain `key=value`
  * pairs and reads `+` as a space.
  */
-class InlineSearchParams {
+class InlineSearchParams implements URLSearchParams {
   pairs: [string, string][] = [];
   constructor(query = "") {
     for (const kv of String(query).replace(/^\?/, "").split("&").filter(Boolean)) {
@@ -240,7 +215,7 @@ class InlineSearchParams {
  * The `URL` of the context, which has none. It splits an absolute URL into its parts and resolves
  * a relative one against a base. It does not parse userinfo, ports or IDNA.
  */
-class InlineURL {
+class InlineURL implements URL {
   protocol = "";
   host = "";
   hostname = "";

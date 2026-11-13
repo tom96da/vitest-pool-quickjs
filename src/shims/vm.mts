@@ -16,7 +16,12 @@ export function runInThisContext(code: string, options?: RunOptions): unknown {
 export const runInContext = runInThisContext;
 
 // Tests call this as `gc`.
-export const runInNewContext = (): (() => void) => __gc;
+export const runInNewContext = (code: "gc"): (() => void) => {
+  if (code !== "gc") {
+    throw new Error(`cannot evaluate "${String(code)}" in a new context. only "gc" is supported`);
+  }
+  return __gc;
+};
 
 export class Script {
   private code: string;

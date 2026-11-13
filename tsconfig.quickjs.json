@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": [],
+    "paths": { "node:*": ["./src/shims/*.mts"] }
+  },
+  "include": [
+    "src/worker.mts",
+    "src/worker/**/*",
+    "src/shims/**/*",
+    "tests/**/*.fixture.mts",
+    "tests/fixture-helpers.mts",
+    "types/quickjs-*.d.mts"
+  ]
+}

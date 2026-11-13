@@ -249,7 +249,7 @@ describe.concurrent("projects that pass", () => {
     ["fixture-rejections", "Tests  11 passed (11)"],
     ["fixture-text-decoder", "Tests  23 passed (23)"],
     ["fixture-timers", "Tests  6 passed (6)"],
-    ["fixture-vm", "Tests  1 passed (1)"],
+    ["fixture-vm", "Tests  2 passed (2)"],
   ])("passes every test of the project %s", async (name, summary) => {
     const { code, stdout } = await runFixture(name);
     expect(stdout).toContain(summary);
