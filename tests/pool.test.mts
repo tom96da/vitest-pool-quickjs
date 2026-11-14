@@ -133,6 +133,16 @@ describe.concurrent("an extension that does not exist", () => {
   });
 });
 
+describe.concurrent("a define that reads a global that the pool hides", () => {
+  it("names the global and the extension to list", async () => {
+    const { code, stdout, stderr } = await runFixture("fixture-define");
+    expect(code).toBe(1);
+    expect(stdout + stderr).toContain(
+      'the define option refers to URL, which the context does not provide. list "url" in the extensions option',
+    );
+  });
+});
+
 describe("file snapshots", () => {
   const out = path.join(snapshotDir, "out.txt");
   beforeAll(async () => {
@@ -245,12 +255,13 @@ describe.concurrent("console of the context", () => {
 describe.concurrent("projects that pass", () => {
   it.each([
     ["fixture-extensions", "Tests  5 passed (5)"],
-    ["fixture-globals", "Tests  55 passed (55)"],
+    ["fixture-globals", "Tests  37 passed (37)"],
+    ["fixture-hidden", "Tests  4 passed (4)"],
     ["fixture-mock", "Tests  1 passed (1)"],
     ["fixture-node-modules", "Tests  10 passed (10)"],
     ["fixture-options", "Tests  7 passed (7)"],
     ["fixture-prelude", "Tests  1 passed (1)"],
-    ["fixture-process", "Tests  8 passed (8)"],
+    ["fixture-process", "Tests  13 passed (13)"],
     ["fixture-promise-matchers", "Tests  3 passed (3)"],
     ["fixture-rejections", "Tests  11 passed (11)"],
     ["fixture-text-decoder", "Tests  23 passed (23)"],
@@ -288,7 +299,7 @@ describe("two contexts that start from one snapshot", () => {
   it("do not share what a file left behind, and repeat what the scripts wrote", async () => {
     // one worker, so that the second file restores the context of the first
     const { code, stdout } = await runFixture("fixture-restore", ["--maxWorkers=1"]);
-    expect(stdout).toContain("Tests  6 passed (6)");
+    expect(stdout).toContain("Tests  8 passed (8)");
     expect(code).toBe(0);
     // what a script writes while it loads comes once for each file, as without a snapshot
     expect(stdout.match(/prelude-output/g)).toHaveLength(2);

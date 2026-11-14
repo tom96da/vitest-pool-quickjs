@@ -22,7 +22,11 @@ export interface QuickJSPoolOptions {
   modules?: Record<string, string>;
   /** Rolldown plugins that apply to the modules the pool loads into the context. */
   plugins?: Plugin[];
-  /** Extensions of quickjs-wasi to load into the context. Each one defines globals of the web. */
+  /**
+   * Extensions of quickjs-wasi whose globals the tests can use, such as `url` for `URL`. The pool
+   * loads `url` and `encoding` for vitest in any case, and the tests see what they define only
+   * when they are listed here.
+   */
   extensions?: Extension[];
   /**
    * Whether the pool saves the context of the first test file as a snapshot right after its setup,
@@ -56,6 +60,8 @@ export interface Prepared {
   wasm: WebAssembly.Module;
   /** The extensions of the engine to load into the context. */
   extensions: { name: string; wasm: WebAssembly.Module }[];
+  /** The extensions that the option lists. Their globals stay visible to the tests. */
+  visible: string[];
   worker: string;
   preludes: { name: string; code: string }[];
   /** The environment variables that vitest resolves for the worker. */

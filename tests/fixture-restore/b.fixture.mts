@@ -16,3 +16,16 @@ it("has the origin of the time of its own thread", () => {
 it("never reads a time before the one that a script noted while it loaded", () => {
   expect(performance.now()).toBeGreaterThanOrEqual((globalThis as { loadedAt?: number }).loadedAt!);
 });
+
+it("hides the globals of the pool, and its timers and rejections work", async () => {
+  for (const name of ["URL", "EventTarget", "AbortController", "__host", "__guest", "__now"]) {
+    expect(name in globalThis).toBe(false);
+  }
+  const seen: unknown[] = [];
+  const listener = (reason: unknown) => seen.push(reason);
+  process.on("unhandledRejection", listener);
+  void Promise.reject(new Error("restored"));
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  process.off("unhandledRejection", listener);
+  expect(seen).toHaveLength(1);
+});

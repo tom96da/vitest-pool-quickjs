@@ -3,6 +3,8 @@
 
 import { VitestSnapshotEnvironment } from "vitest/runtime";
 
+import { host } from "./host.mts";
+
 /**
  * The snapshot environment of the context. It reads and writes the files through the thread,
  * because the context has no file system.
@@ -19,7 +21,7 @@ export class SnapshotEnvironment extends VitestSnapshotEnvironment {
   }
 
   override async saveSnapshotFile(file: string, text: string): Promise<void> {
-    await __writeFile(file, text);
+    await host.writeFile(file, text);
   }
 
   // vitest reads the test file only to write an inline snapshot into it, at a position that the
@@ -31,10 +33,10 @@ export class SnapshotEnvironment extends VitestSnapshotEnvironment {
           "use toMatchSnapshot or write the expected value by hand",
       );
     }
-    return (await __readFile(file)) ?? null;
+    return (await host.readFile(file)) ?? null;
   }
 
   override async removeSnapshotFile(file: string): Promise<void> {
-    await __removeFile(file);
+    await host.removeFile(file);
   }
 }

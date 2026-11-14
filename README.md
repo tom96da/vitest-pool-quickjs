@@ -58,6 +58,17 @@ An extension defines globals of the web. List the ones to use, for example:
 quickjsPool({ extensions: ["structured-clone", "crypto"] });
 ```
 
+## Globals
+
+A test and the packages in `externals` see the globals of the engine, `process`, the timers and the
+globals of the extensions that the option lists.
+
+To have another global, define it in a module of `setupFiles`. A package in `externals` that reads
+the global while it loads needs it earlier, so define it in a script of `preludes` instead.
+
+The `define` option of Vitest stops the run with an error that names the global when it refers to
+one that is not defined.
+
 ## Settings
 
 - Set `fsModuleCache: false`. Vitest 5.1 caches the transformed modules on the file system by
@@ -69,8 +80,9 @@ quickjsPool({ extensions: ["structured-clone", "crypto"] });
 - With `isolate: false` one context holds the modules of every file.
 - A context has 1 GiB of memory.
 - Recursion deeper than about 1600 frames of a small function throws a `RangeError`.
-- The context has the globals of the web and of Node that Vitest reads and those of the extensions
-  that the option lists, and no others.
+- The context has the globals of the engine, `process`, the timers and those of the extensions that
+  the option lists, and no others. `process` has `env`, `versions`, `cwd`, `memoryUsage`, `stdout`,
+  `stderr` and the methods for listeners.
 - The console does not print `time`, `timeEnd` and `timeLog`.
 - A method in a stack trace shows as `m` where V8 shows `Class.m`.
 - With `snapshot` on, a value that a script or a package makes while it loads, such as a random id

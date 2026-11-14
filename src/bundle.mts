@@ -6,7 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { rolldown } from "rolldown";
-import type { Plugin, PluginContext } from "rolldown";
+import type { InputOptions, Plugin, PluginContext } from "rolldown";
+import { transform } from "rolldown/utils";
 import dedent from "ts-dedent";
 
 import type { QuickJSPoolOptions } from "./types.mts";
@@ -21,6 +22,24 @@ const ext = import.meta.url.endsWith(".mts") ? ".mts" : ".js";
  * @returns the URL of the module
  */
 export const asset = (name: string): URL => new URL(`./${name}${ext}`, import.meta.url);
+
+/**
+ * The module that holds what vitest and the pool read in place of the globals that they hide. The
+ * build puts it next to `worker`, which the sources keep in a directory of its own.
+ */
+const prelude = fileURLToPath(asset(ext === ".mts" ? "worker/prelude" : "prelude"));
+
+/**
+ * The identifiers that the modules of vitest and of the pool read, with the export of the prelude
+ * that replaces each, also when the global is read as a property of `globalThis`. They are the
+ * globals that the tests do not see, and the function that the module runner imports through.
+ */
+const captured: Record<string, [string, string]> = {
+  __externalImport: [prelude, "externalImport"],
+};
+for (const name of ["EventTarget", "Event", "AbortController", "URL", "TextDecoder"]) {
+  captured[name] = captured[`globalThis.${name}`] = [prelude, name];
+}
 
 /**
  * Locates the module that replaces a `node:*` module.
@@ -113,7 +132,9 @@ function externalModules(specifiers: string[], root: string): Plugin {
         entries.push(`[${JSON.stringify(specifier)}, e${i}]`);
         if (resolved) entries.push(`[${JSON.stringify(resolved.id)}, e${i}]`);
       }
+      // the prelude runs before the packages, which read the globals of the context while they load
       return dedent`
+        import ${JSON.stringify(prelude)};
         ${imports.join("\n")}
         export default Object.fromEntries([${entries.join(",")}]);
       `;
@@ -129,7 +150,7 @@ const externalImport: Plugin = {
   name: "vitest-pool-quickjs:external-import",
   transform(code, id) {
     if (!id.endsWith("/vitest/dist/module-evaluator.js")) return null;
-    const replaced = code.replace(": import(file)", ": globalThis.__externalImport(file)");
+    const replaced = code.replace(": import(file)", ": __externalImport(file)");
     if (replaced === code)
       this.error(
         "vitest changed how it imports externalized modules. " +
@@ -138,6 +159,53 @@ const externalImport: Plugin = {
     return replaced;
   },
 };
+
+/**
+ * Makes the plugin that gives the modules of `own` the captured globals in place of the globals of
+ * the context. The prelude, which captures them, and the externals read the context as it is.
+ * @param own - the ids of the modules of vitest and of the pool
+ * @returns the plugin
+ */
+function capturedGlobals(own: Set<string>): Plugin {
+  return {
+    name: "vitest-pool-quickjs:captured-globals",
+    async transform(code, id) {
+      if (
+        id === prelude ||
+        !own.has(id) ||
+        !Object.keys(captured).some((name) => code.includes(name))
+      )
+        return null;
+      const result = await transform(id, code, { inject: captured });
+      if (result.errors.length > 0) this.error(result.errors[0]!.message);
+      return result.code;
+    },
+  };
+}
+
+/**
+ * Finds the modules that vitest and the pool load, which are the ones that the build reaches
+ * without the externals. A module that an external shares with vitest is one of them.
+ * @param options - the options of the build
+ * @returns the ids of the modules
+ */
+async function ownModules(options: InputOptions): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const collect: Plugin = {
+    name: "vitest-pool-quickjs:collect",
+    transform(_code, id) {
+      ids.add(id);
+      return null;
+    },
+  };
+  const build = await rolldown({
+    ...options,
+    plugins: [collect, ...(options.plugins as Plugin[])],
+  });
+  await build.generate({ format: "iife", codeSplitting: false });
+  await build.close();
+  return ids;
+}
 
 /** The hook that the helper of vitest sets to read the stack of a new error without a source map. */
 const stackHook = "Error.prepareStackTrace = (e) => e.stack;";
@@ -184,20 +252,25 @@ export async function buildWorker(
   }: Pick<QuickJSPoolOptions, "externals" | "modules" | "plugins">,
 ): Promise<string> {
   const shims = await shimNames();
-  const build = await rolldown({
-    input: fileURLToPath(asset("worker")),
+  const input = fileURLToPath(asset("worker"));
+  const settings: InputOptions = {
+    input,
     platform: "neutral",
     resolve: { conditionNames: ["import", "default"], mainFields: ["module", "main"] },
     checks: { bundlerTimings: false },
     // the optional environments of vitest (jsdom, happy-dom) are not installed and not used
     onLog() {},
-    plugins: [
-      externalModules(externals, root),
-      nodeModules(modules, shims),
-      externalImport,
-      plainStack(),
-      ...plugins,
-    ],
+  };
+  const pool = (listed: string[]): Plugin[] => [
+    externalModules(listed, root),
+    nodeModules(modules, shims),
+    externalImport,
+    plainStack(),
+  ];
+  const own = await ownModules({ ...settings, plugins: [...pool([]), ...plugins] });
+  const build = await rolldown({
+    ...settings,
+    plugins: [...pool(externals), capturedGlobals(own), ...plugins],
   });
   const { output } = await build.generate({ format: "iife", codeSplitting: false });
   await build.close();

@@ -234,7 +234,7 @@ describe("a worker that starts again after its prelude changed", () => {
     try {
       const written: string[] = [];
       for (const version of ["first", "second"]) {
-        await writeFile(file, `__stdout("prelude ${version}\\n");`);
+        await writeFile(file, `__host.stdout("prelude ${version}\\n");`);
         const worker = pool.createPoolWorker({
           project: { config: { root, fsModuleCache: false } },
           env: {},
@@ -259,7 +259,7 @@ describe("the snapshot option", () => {
    */
   async function twoStarts(snapshot: boolean | undefined) {
     const file = path.join(await mkdtemp(path.join(tmpdir(), "prelude-")), "prelude.js");
-    await writeFile(file, '__stdout("at " + Date.now() + "\\n");');
+    await writeFile(file, '__host.stdout("at " + Date.now() + "\\n");');
     const pool = quickjsPool({ preludes: [file], snapshot });
     const stdout = vi.spyOn(process.stdout, "write").mockReturnValue(true);
     try {
@@ -323,7 +323,7 @@ describe("the snapshot after a start that ended early", () => {
    */
   async function prelude() {
     const file = path.join(await mkdtemp(path.join(tmpdir(), "prelude-")), "prelude.js");
-    await writeFile(file, '__stdout("at " + Date.now() + " A=" + __env.A + "\\n");');
+    await writeFile(file, '__host.stdout("at " + Date.now() + " A=" + __host.env.A + "\\n");');
     return file;
   }
 

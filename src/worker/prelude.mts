@@ -3,6 +3,19 @@
 
 // The globals that vitest reads while it loads and that QuickJS lacks. This module runs first in
 // the worker bundle.
+//
+// A global stays visible to the tests only when a test needs it. These are `process`, the timers
+// and what an extension of the option defines. The rest is exported here, and the bundle gives it
+// to the modules of vitest and of the pool in place of the global, so that no test and no external
+// finds it.
+
+import { internalExtensions } from "../extensions.mts";
+import { guest, host } from "./host.mts";
+
+const visible = new Set(host.visible);
+
+/** The module runner imports what the server externalized through this function. */
+export const externalImport = (file: string) => guest.externalImport(file);
 
 /** The listener that `once` registers. It holds the listener it wraps. */
 type Wrapper = ProcessListener & { listener: ProcessListener };
@@ -31,18 +44,11 @@ const once = (name: string, f: ProcessListener): typeof process => {
   );
   return on(name, wrapper);
 };
-// the environment that vitest resolves for the worker: TEST, VITEST, NODE_ENV and more
-const env: Record<string, string> = { ...globalThis.__env };
-Reflect.deleteProperty(globalThis, "__env");
 /** The `process` of the context. */
 const proc: typeof process = {
-  env,
-  argv: [],
-  platform: "quickjs",
+  env: { ...host.env },
   versions: {},
   cwd: () => "/",
-  nextTick: (f) => queueMicrotask(f),
-  emitWarning() {},
   listeners: (name) => (listeners.get(name) ?? []).map((f) => (f as Wrapper).listener ?? f),
   on,
   once,
@@ -54,25 +60,20 @@ const proc: typeof process = {
     return proc;
   },
   memoryUsage: () => ({ heapUsed: 0 }),
-  exit() {
-    throw new Error("process.exit");
-  },
-  hrtime: Object.assign((): [number, number] => [0, 0], {
-    bigint: () => BigInt(Math.round(__now() * 1e6)),
-  }),
-  stdout: { write: (text, callback) => (__stdout(String(text)), callback?.(), true) },
-  stderr: { write: (text, callback) => (__stderr(String(text)), callback?.(), true) },
+  stdout: { write: (text, callback) => (host.stdout(String(text)), callback?.(), true) },
+  stderr: { write: (text, callback) => (host.stderr(String(text)), callback?.(), true) },
 };
+Object.assign(globalThis, { process: proc });
 
-Object.assign(globalThis, {
-  process: proc,
-  EventTarget: class {
-    addEventListener() {}
-    removeEventListener() {}
-    dispatchEvent() {}
-  },
-  Event: class {},
-});
+/** The `EventTarget` of vitest, which has none to read. */
+export class EventTarget {
+  addEventListener() {}
+  removeEventListener() {}
+  dispatchEvent() {}
+}
+/** The `Event` of vitest, which has none to read. */
+export class Event {}
+
 if (!("console" in globalThis)) Object.assign(globalThis, { console: {} });
 
 // The module runner of Vite sets Error.prepareStackTrace to name the error and map the positions to
@@ -115,7 +116,7 @@ if (!("console" in globalThis)) Object.assign(globalThis, { console: {} });
   });
 }
 
-// Real timers: the pool sleeps until __timerDelay() and then calls __fireTimers().
+// The timers are real. The pool sleeps until guest.timerDelay() and then calls guest.fireTimers().
 {
   /** A timer that waits in the queue. */
   interface Timer {
@@ -131,7 +132,7 @@ if (!("console" in globalThis)) Object.assign(globalThis, { console: {} });
     (repeat: boolean) =>
     (cb: Timer["cb"], delay = 0, ...args: unknown[]) => {
       const wait = Math.max(1, Number(delay) || 0);
-      queue.set(++seq, { cb, args, wait, repeat, at: __now() + wait });
+      queue.set(++seq, { cb, args, wait, repeat, at: host.now() + wait });
       return seq;
     };
   const clear = (id: number) => void queue.delete(id);
@@ -140,15 +141,15 @@ if (!("console" in globalThis)) Object.assign(globalThis, { console: {} });
     setInterval: add(true),
     clearTimeout: clear,
     clearInterval: clear,
-    performance: { now: () => __now(), timeOrigin: Date.now() - __now() },
-    __timerDelay: () => {
+  });
+  Object.assign(guest, {
+    timerDelay: () => {
       let next = Infinity;
       for (const t of queue.values()) next = Math.min(next, t.at);
-      return next === Infinity ? -1 : Math.max(0, next - __now());
+      return next === Infinity ? -1 : Math.max(0, next - host.now());
     },
-    // runs the earliest due timer and returns 1, or returns 0 when none is due
-    __fireTimers: () => {
-      const now = __now();
+    fireTimers: () => {
+      const now = host.now();
       let first: [number, Timer] | undefined;
       for (const entry of queue)
         if (entry[1].at <= now && (!first || entry[1].at < first[1].at)) first = entry;
@@ -184,8 +185,8 @@ class InlineAbortSignal implements AbortSignal {
   }
 }
 
-/** An `AbortController` for the context, which has none. */
-class InlineAbortController implements InstanceType<typeof AbortController> {
+/** The `AbortController` of vitest, which has none to read. */
+export class AbortController {
   signal = new InlineAbortSignal();
   abort(reason: unknown = new Error("aborted")) {
     const s = this.signal;
@@ -195,118 +196,23 @@ class InlineAbortController implements InstanceType<typeof AbortController> {
     for (const f of s.handlers) f({ type: "abort" });
   }
 }
-if (!("AbortController" in globalThis)) {
-  Object.assign(globalThis, { AbortController: InlineAbortController });
+
+// What vitest and the pool read in place of a global. The extensions define their globals before
+// any script runs, so the ones that the option does not list are captured here and then removed.
+export const URL = globalThis.URL;
+export const TextDecoder = globalThis.TextDecoder;
+
+for (const [extension, names] of Object.entries(internalExtensions)) {
+  if (visible.has(extension)) continue;
+  for (const name of names) Reflect.deleteProperty(globalThis, name);
 }
 
-// an invalid sequence of escapes becomes U+FFFD, and a lone % stays as it is
-const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
-const decode = (text: string) =>
-  text
-    .replace(/\+/g, " ")
-    .replace(/(?:%[0-9a-f]{2})+/gi, (run) =>
-      utf8.decode(Uint8Array.from(run.slice(1).split("%"), (hex) => parseInt(hex, 16))),
-    );
-
-const encode = (text: string) =>
-  encodeURIComponent(
-    text.replace(
-      /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g,
-      "\ufffd",
-    ),
-  )
-    .replace(/%20/g, "+")
-    .replace(/[!'()~]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
-
-/**
- * The `URLSearchParams` of the context, which has none. It parses and writes plain `key=value`
- * pairs and reads `+` as a space.
- */
-class InlineSearchParams implements URLSearchParams {
-  pairs: [string, string][] = [];
-  constructor(query = "") {
-    for (const kv of String(query).replace(/^\?/, "").split("&").filter(Boolean)) {
-      const eq = kv.indexOf("=");
-      const [k, v] = eq < 0 ? [kv, ""] : [kv.slice(0, eq), kv.slice(eq + 1)];
-      this.pairs.push([decode(k), decode(v)]);
-    }
-  }
-  get(k: string) {
-    return this.pairs.find((e) => e[0] === k)?.[1] ?? null;
-  }
-  has(k: string) {
-    return this.pairs.some((e) => e[0] === k);
-  }
-  append(k: string, v: unknown) {
-    this.pairs.push([k, String(v)]);
-  }
-  delete(k: string) {
-    this.pairs = this.pairs.filter((e) => e[0] !== k);
-  }
-  toString() {
-    return this.pairs.map(([k, v]) => `${encode(k)}=${encode(v)}`).join("&");
-  }
-}
-
-/**
- * The `URL` of the context, which has none. It splits an absolute URL into its parts and resolves
- * a relative one against a base. It does not parse userinfo, ports or IDNA.
- */
-class InlineURL implements URL {
-  protocol = "";
-  host = "";
-  hostname = "";
-  pathname = "";
-  search = "";
-  hash = "";
-  origin = "null";
-  searchParams = new InlineSearchParams();
-  constructor(input: unknown, base?: unknown) {
-    const text = String(input);
-    const m = /^([a-zA-Z][\w+.-]*:)(\/\/([^/?#]*))?([^?#]*)(\?[^#]*)?(#.*)?$/.exec(text);
-    if (!m) {
-      if (base === undefined) throw new TypeError(`invalid URL. got ${JSON.stringify(text)}`);
-      const b = new InlineURL(base);
-      return new InlineURL(
-        text.startsWith("//")
-          ? b.protocol + text
-          : text.startsWith("/")
-            ? b.origin + text
-            : b.href.replace(/[^/]*$/, "") + text,
-      );
-    }
-    this.protocol = m[1]!;
-    this.host = this.hostname = m[3] ?? "";
-    this.pathname = m[4] || (m[2] ? "/" : "");
-    this.search = m[5] ?? "";
-    this.hash = m[6] ?? "";
-    this.searchParams = new InlineSearchParams(this.search);
-    if (m[2]) this.origin = `${this.protocol}//${this.host}`;
-  }
-  get href() {
-    const slashes = this.host || this.protocol === "file:" ? `//${this.host}` : "";
-    return this.protocol + slashes + this.pathname + this.search + this.hash;
-  }
-  toString() {
-    return this.href;
-  }
-  toJSON() {
-    return this.href;
-  }
-}
-if (!("URLSearchParams" in globalThis)) {
-  Object.assign(globalThis, { URLSearchParams: InlineSearchParams });
-}
-if (!("URL" in globalThis)) Object.assign(globalThis, { URL: InlineURL });
-
-// The thread records the rejections that nothing handles in __rejections. The pool calls this after
+// The thread records the rejections that nothing handles in host.rejections. The pool calls this after
 // the pending jobs ran, so a handler that a job attaches in the same turn has removed its entry.
-Object.assign(globalThis, {
-  __flushRejections: () => {
-    for (const key of Object.keys(__rejections)) {
-      const entry = __rejections[key];
-      delete __rejections[key];
-      if (entry) for (const f of raw("unhandledRejection")) f(entry.reason, entry.promise);
-    }
-  },
-});
+guest.flushRejections = () => {
+  for (const key of Object.keys(host.rejections)) {
+    const entry = host.rejections[key];
+    delete host.rejections[key];
+    if (entry) for (const f of raw("unhandledRejection")) f(entry.reason, entry.promise);
+  }
+};

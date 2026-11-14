@@ -3,7 +3,7 @@
 
 // the scripts that run before the worker take their time, note the time and write to the output
 // while they load
-const until = __now() + 200;
-while (__now() < until);
-globalThis.loadedAt = __now();
-__stdout("prelude-output\n");
+const until = performance.now() + 200;
+while (performance.now() < until);
+globalThis.loadedAt = performance.now();
+__host.stdout("prelude-output\n");

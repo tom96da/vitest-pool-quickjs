@@ -7,6 +7,33 @@
 declare global {
   // the engine
   function queueMicrotask(callback: () => void): void;
+  var performance: { now(): number; timeOrigin: number };
+
+  // the url extension
+  interface URLSearchParams {
+    append(name: string, value: unknown): void;
+    delete(name: string): void;
+    get(name: string): string | null;
+    has(name: string): boolean;
+    toString(): string;
+  }
+  var URLSearchParams: { new (init?: string): URLSearchParams };
+
+  interface URL {
+    readonly href: string;
+    readonly protocol: string;
+    readonly host: string;
+    readonly hostname: string;
+    readonly port?: string;
+    readonly pathname: string;
+    readonly search: string;
+    readonly hash: string;
+    readonly origin: string;
+    readonly searchParams: URLSearchParams;
+    toString(): string;
+    toJSON(): string;
+  }
+  var URL: { new (url: string | URL, base?: string | URL): URL };
 
   // the encoding extension
   interface TextDecoderOptions {

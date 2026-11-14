@@ -10,7 +10,7 @@ import { Worker } from "node:worker_threads";
 import type { PoolOptions, PoolRunnerInitializer, PoolWorker, WorkerRequest } from "vitest/node";
 
 import { asset, buildWorker } from "./bundle.mts";
-import { knownExtensions } from "./extensions.mts";
+import { internalExtensions, knownExtensions } from "./extensions.mts";
 import type { ContextSnapshot, Prepared, QuickJSPoolOptions, Report } from "./types.mts";
 import { decode, encode } from "./worker/codec.mts";
 
@@ -143,8 +143,9 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
       `the snapshot option takes true or false, not ${JSON.stringify(options.snapshot)}`,
     );
   }
-  // the pool decodes UTF-8 with the encoding extension
-  const extensions = [...new Set(["encoding", ...(options.extensions ?? [])])];
+  // vitest decodes UTF-8 and makes URLs with these extensions, whose globals stay hidden unless listed
+  const visible = [...new Set(options.extensions ?? [])];
+  const extensions = [...new Set([...Object.keys(internalExtensions), ...visible])];
   // the build is the slow part, so it is kept for the root; the scripts are read at every start
   const builds = new Map<string, Promise<string>>();
   // a snapshot is kept for each root and environment while the preludes stay the same, so that the
@@ -165,6 +166,7 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
       extensions: await Promise.all(
         extensions.map(async (name) => ({ name, wasm: await compile(`quickjs-wasi/${name}.so`) })),
       ),
+      visible,
       worker: await builds.get(root)!,
       env: Object.fromEntries(
         Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined),

@@ -19,14 +19,6 @@ describe("process listeners", () => {
     expect(calls).toBe(1);
   });
 
-  it("runs a nextTick callback before a timer that was set earlier", async () => {
-    const order: string[] = [];
-    setTimeout(() => order.push("timer"), 0);
-    process.nextTick(() => order.push("tick"));
-    await sleep(1);
-    expect(order).toEqual(["tick", "timer"]);
-  });
-
   it("returns the original function of a once listener", () => {
     const f = () => {};
     process.once("fixture-once", f);
@@ -60,6 +52,15 @@ describe("process listeners", () => {
     expect(process.listeners("fixture-a")).toHaveLength(0);
     expect(process.listeners("fixture-b")).toHaveLength(1);
   });
+});
+
+describe("process", () => {
+  it.each(["argv", "platform", "nextTick", "emitWarning", "hrtime", "execPath"])(
+    "has no %s",
+    (name) => {
+      expect(name in process).toBe(false);
+    },
+  );
 });
 
 describe("process.env", () => {

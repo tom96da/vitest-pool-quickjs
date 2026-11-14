@@ -12,3 +12,15 @@ export const knownExtensions = [
 
 /** An extension of quickjs-wasi. */
 export type Extension = (typeof knownExtensions)[number];
+
+/**
+ * The extensions that vitest needs, with the globals that each defines. The tests see these
+ * globals only when the option lists the extension.
+ */
+export const internalExtensions = {
+  url: ["URL", "URLSearchParams"],
+  encoding: ["TextDecoder", "TextEncoder"],
+} as const;
+
+/** The globals that the pool defines itself, which no test sees. */
+export const ownGlobals = ["EventTarget", "Event", "AbortController"] as const;

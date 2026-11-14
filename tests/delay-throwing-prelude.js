@@ -1,8 +1,7 @@
-// Couples to the worker defining `__timerDelay` with Object.assign on the global.
-// A setter that drops the definition of the worker leaves this getter as the global.
-Object.defineProperty(globalThis, "__timerDelay", {
-  get: () => () => {
-    throw new Error("delay failed");
-  },
-  set() {},
-});
+// Couples to the prelude of the worker reading its timers with Map.prototype.values in a function
+// named timerDelay. The values of any other map are read as usual.
+const { value: values } = Object.getOwnPropertyDescriptor(Map.prototype, "values");
+Map.prototype.values = function () {
+  if (new Error().stack.includes("timerDelay")) throw new Error("delay failed");
+  return values.call(this);
+};

@@ -3,4 +3,5 @@
 
 import { fixtureConfig } from "../fixture-config.mts";
 
-export default fixtureConfig();
+// vitest has the global TextDecoder only when the extension is listed
+export default fixtureConfig({ extensions: ["encoding"] });

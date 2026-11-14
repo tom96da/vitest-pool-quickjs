@@ -1,7 +1,8 @@
 // Copyright (c) 2026 tom96da
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-// The globals that the prelude defines in the context. The engine has none of them.
+// The globals that the prelude defines in the context, and the ones it hides from the tests and
+// gives to vitest alone. The engine has none of them.
 
 declare global {
   type ProcessListener = (...args: unknown[]) => void;
@@ -40,17 +41,10 @@ declare global {
   function clearTimeout(id: number | undefined): void;
   function clearInterval(id: number | undefined): void;
 
-  var performance: { now(): number; timeOrigin: number };
-
   var process: {
     env: Record<string, string | undefined>;
-    argv: string[];
-    platform: string;
     versions: Record<string, string>;
-    execPath?: string;
     cwd(): string;
-    nextTick(callback: () => void): void;
-    emitWarning(): void;
     listeners(name: string): ProcessListener[];
     on(name: string, listener: ProcessListener): typeof process;
     once(name: string, listener: ProcessListener): typeof process;
@@ -58,8 +52,6 @@ declare global {
     removeListener(name: string, listener: ProcessListener): typeof process;
     removeAllListeners(name?: string): typeof process;
     memoryUsage(): { heapUsed: number };
-    exit(code?: number): never;
-    hrtime: { (): [number, number]; bigint(): bigint };
     stdout: { write(text: string, callback?: () => void): boolean };
     stderr: { write(text: string, callback?: () => void): boolean };
   };
@@ -71,35 +63,6 @@ declare global {
     removeEventListener(type: string, listener: AbortListener): void;
     throwIfAborted(): void;
   }
-  var AbortController: {
-    new (): { readonly signal: AbortSignal; abort(reason?: unknown): void };
-  };
-
-  // the url extension defines them too, with more members
-  interface URLSearchParams {
-    append(name: string, value: unknown): void;
-    delete(name: string): void;
-    get(name: string): string | null;
-    has(name: string): boolean;
-    toString(): string;
-  }
-  var URLSearchParams: { new (init?: string): URLSearchParams };
-
-  interface URL {
-    readonly href: string;
-    readonly protocol: string;
-    readonly host: string;
-    readonly hostname: string;
-    readonly port?: string;
-    readonly pathname: string;
-    readonly search: string;
-    readonly hash: string;
-    readonly origin: string;
-    readonly searchParams: URLSearchParams;
-    toString(): string;
-    toJSON(): string;
-  }
-  var URL: { new (url: string | URL, base?: string | URL): URL };
 }
 
 export {};
