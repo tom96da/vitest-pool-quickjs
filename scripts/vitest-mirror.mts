@@ -17,10 +17,6 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { stripVTControlCharacters, styleText } from "node:util";
 
-import { dedent } from "ts-dedent";
-
-import externals from "./vitest-externals.json" with { type: "json" };
-
 const root = path.resolve(import.meta.dirname, "..");
 const source = path.join(root, "vitest");
 // a path with a directory that starts with a dot would not match the globs of the config of Vitest
@@ -177,20 +173,7 @@ async function prepare(): Promise<void> {
       2,
     ),
   );
-  const pool = pathToFileURL(path.join(root, "src/index.mts")).href;
-  await writeFile(path.join(mirror, "test/unit/forks.config.ts"), makeConfig("", `pool: "forks",`));
-  await writeFile(
-    path.join(mirror, "test/unit/pool.config.ts"),
-    makeConfig(
-      `import { quickjsPool } from ${JSON.stringify(pool)};`,
-      dedent`
-        pool: quickjsPool({ externals: ${JSON.stringify(externals)} }),
-        fsModuleCache: false,
-        maxWorkers: 1,
-        execArgv: undefined,
-      `,
-    ),
-  );
+  await copy(path.join(root, "scripts/vitest-mirror"), "test/unit");
   await run(
     "pnpm",
     ["install", "--ignore-workspace", "--ignore-scripts", "--config.node-linker=hoisted"],
@@ -198,32 +181,6 @@ async function prepare(): Promise<void> {
   );
   console.log(`Mirror created: ${mirror}`);
 }
-
-/**
- * Makes the config that runs the unit project of Vitest with a pool. The report goes to the file
- * of the environment variable OUT.
- * @param header - the imports of the config
- * @param options - the options of the pool
- * @returns the source of the config
- */
-const makeConfig = (header: string, options: string): string => dedent`
-  import base from "./vite.config.ts";
-  ${header}
-
-  const { projects: _projects, ...test } = base.test!;
-  export default {
-    ...base,
-    test: {
-      ...test,
-      typecheck: { enabled: false },
-      reporters: ["default", "json"],
-      outputFile: { json: process.env.OUT },
-      testTimeout: 10_000,
-      hookTimeout: 10_000,
-      ${options}
-    },
-  };
-`;
 
 /**
  * Runs the unit tests of Vitest in the mirror and writes the report. A failing run is not an
@@ -234,6 +191,7 @@ const makeConfig = (header: string, options: string): string => dedent`
  */
 async function vitest(config: string, report: string, args: string[]): Promise<void> {
   process.env.OUT ??= path.join(mirror, report);
+  process.env.POOL ??= pathToFileURL(path.join(root, "src/index.mts")).href;
   await run(
     process.execPath,
     [path.join(mirror, "node_modules/vitest/vitest.mjs"), "run", "--config", config, ...args],
@@ -321,8 +279,8 @@ async function compare(): Promise<void> {
 
 const [command, ...args] = process.argv.slice(2);
 if (command === "prepare") await prepare();
-else if (command === "baseline") await vitest("forks.config.ts", "baseline.json", args);
-else if (command === "pool") await vitest("pool.config.ts", "pool.json", args);
+else if (command === "baseline") await vitest("forks.config.mts", "baseline.json", args);
+else if (command === "pool") await vitest("pool.config.mts", "pool.json", args);
 else if (command === "compare") await compare();
 else
   throw new Error(

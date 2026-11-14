@@ -5,7 +5,7 @@
     "src/*.mts",
     "src/worker/codec.mts",
     "tests/*.mts",
-    "scripts/*.mts",
+    "scripts",
     "types/node-*.d.mts",
     "*.mts"
   ],
