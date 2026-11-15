@@ -7,13 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- the `vite` option sets the Vite build of the externals and the modules ([d87360e](https://github.com/tom96da/vitest-pool-quickjs/commit/d87360e))
+- the `configFile` of the `vite` option takes `resolve.alias`, `define` and `plugins` from a file ([d87360e](https://github.com/tom96da/vitest-pool-quickjs/commit/d87360e))
+
 ### Changed
 
 - hide the globals that the pool provides for Vitest from the tests and the packages of `externals` ([91b8f43](https://github.com/tom96da/vitest-pool-quickjs/commit/91b8f43))
+- build with the Vite of the project in place of Rolldown, which needs Vite 6.4, 7 or 8 ([d87360e](https://github.com/tom96da/vitest-pool-quickjs/commit/d87360e))
+- take Vite plugins in `plugins` in place of Rolldown plugins ([d87360e](https://github.com/tom96da/vitest-pool-quickjs/commit/d87360e))
+
+### Deprecated
+
+- deprecate the `plugins` option in favor of `vite.plugins` ([d87360e](https://github.com/tom96da/vitest-pool-quickjs/commit/d87360e))
 
 ### Removed
 
 - drop the members of `process` that Vitest does not require ([91b8f43](https://github.com/tom96da/vitest-pool-quickjs/commit/91b8f43))
+- drop the dependency on `rolldown` ([d87360e](https://github.com/tom96da/vitest-pool-quickjs/commit/d87360e))
 
 ## [0.2.4] - 2026-11-14
 
