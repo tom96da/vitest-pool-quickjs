@@ -5,5 +5,6 @@ declare const main: {
   add(a: number, b: number): number;
   greet(name: string): string;
   token: string;
+  setting: string;
 };
 export = main;

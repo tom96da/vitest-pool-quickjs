@@ -3,12 +3,13 @@
 
 import os from "node:os";
 import * as perfHooks from "node:perf_hooks";
+import v8 from "node:v8";
 
 import { describe, expect, it } from "vitest";
 
 import { imported } from "#imported";
 
-import main, { add, greet, token } from "./lib/main.cjs";
+import main, { add, greet, setting, token } from "./lib/main.cjs";
 
 describe("a CommonJS file in externals", () => {
   it("reads module.exports from the default import", () => {
@@ -38,10 +39,20 @@ describe("the modules option", () => {
   it("serves a module that the pool has no module for", () => {
     expect(os.EOL).toBe("custom eol");
   });
+
+  it("gives a module the hidden globals that it reads", () => {
+    expect(v8.url).toBe("function");
+  });
 });
 
 describe("the plugins option", () => {
   it("transforms a module that the pool loads", () => {
     expect(token).toBe("replaced by a plugin");
+  });
+});
+
+describe("the vite option", () => {
+  it("applies to the build of the modules that the pool loads", () => {
+    expect(setting).toBe("from the vite option");
   });
 });

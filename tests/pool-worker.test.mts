@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 import type { EventEmitter } from "node:events";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { WorkerRequest } from "vitest/node";
 
 import { encode } from "../src/worker/codec.mts";
@@ -29,6 +29,58 @@ async function started() {
   await worker.start();
   return { worker, errors };
 }
+
+describe("a worker whose build failed", () => {
+  it("rejects the start when the config file is missing", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "pool-build-"));
+    onTestFinished(() => rm(dir, { recursive: true, force: true }));
+    const unhandled = vi.fn<() => void>();
+    process.on("unhandledRejection", unhandled);
+    onTestFinished(() => void process.off("unhandledRejection", unhandled));
+    const pool = quickjsPool({ vite: { configFile: path.join(dir, "none.mjs") } });
+    const worker = pool.createPoolWorker({
+      project: { config: { root: dir, fsModuleCache: false } },
+      env: {},
+    } as never);
+    await expect(worker.start()).rejects.toThrow("config file not found");
+    // an unhandled rejection is reported on a later tick
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(unhandled).not.toHaveBeenCalled();
+  });
+
+  it("rejects a second format in build.lib.formats", async () => {
+    const pool = quickjsPool({
+      vite: {
+        build: {
+          lib: { entry: path.resolve(import.meta.dirname, "../src/worker.mts"), formats: ["es"] },
+        },
+      },
+    });
+    const worker = pool.createPoolWorker({
+      project: { config: { root, fsModuleCache: false } },
+      env: {},
+    } as never);
+    await expect(worker.start()).rejects.toThrow("needs one script");
+  }, 30_000);
+
+  it("builds again at the next start", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "pool-build-"));
+    onTestFinished(() => rm(dir, { recursive: true, force: true }));
+    const file = path.join(dir, "vite.config.mjs");
+    await writeFile(file, 'throw new Error("boom");');
+    const pool = quickjsPool({ vite: { configFile: file } });
+    const worker = () =>
+      pool.createPoolWorker({
+        project: { config: { root: dir, fsModuleCache: false } },
+        env: {},
+      } as never);
+    await expect(worker().start()).rejects.toThrow("could not load the config file");
+    await writeFile(file, "export default {};");
+    const fixed = worker();
+    await fixed.start();
+    await fixed.stop();
+  }, 30_000);
+});
 
 describe("the error event of a worker", () => {
   it("carries the error of a message that cannot be sent", async () => {

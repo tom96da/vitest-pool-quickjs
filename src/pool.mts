@@ -159,8 +159,15 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
     root: string,
     env: Record<string, string | undefined>,
   ): Promise<Preparation> => {
-    if (!builds.has(root)) {
-      builds.set(root, buildWorker(root, options));
+    let build = builds.get(root);
+    if (!build) {
+      build = buildWorker(root, options);
+      builds.set(root, build);
+      // a failed build is not kept, so that a fixed config works on the next start
+      const failed = build;
+      failed.catch(() => {
+        if (builds.get(root) === failed) builds.delete(root);
+      });
     }
     const base: Prepared = {
       wasm: await compile("quickjs-wasi/quickjs.wasm"),
@@ -168,7 +175,7 @@ export function quickjsPool(options: QuickJSPoolOptions = {}): PoolRunnerInitial
         extensions.map(async (name) => ({ name, wasm: await compile(`quickjs-wasi/${name}.so`) })),
       ),
       visible,
-      worker: await builds.get(root)!,
+      worker: await build,
       env: Object.fromEntries(
         Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined),
       ),

@@ -3,4 +3,4 @@
 
 const { greet } = require("./helper.cjs");
 
-module.exports = { add: (a, b) => a + b, greet, token: "__TOKEN__" };
+module.exports = { add: (a, b) => a + b, greet, token: "__TOKEN__", setting: __SETTING__ };

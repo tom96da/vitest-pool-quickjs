@@ -175,9 +175,6 @@ importers:
       quickjs-wasi:
         specifier: ~3.6.4
         version: 3.6.4
-      rolldown:
-        specifier: ~1.2.18
-        version: 1.2.18
     devDependencies:
       '@arethetypeswrong/core':
         specifier: ^0.18.5
@@ -212,6 +209,9 @@ importers:
       typescript:
         specifier: npm:@typescript/typescript6@^6.0.2
         version: '@typescript/typescript6@6.0.2'
+      vite:
+        specifier: ^8.3.7
+        version: 8.3.7(@types/node@26.6.6)
       vitest:
         specifier: ^5.0.3
         version: 5.1.0(@types/node@26.6.6)(vite@8.3.7(@types/node@26.6.6))

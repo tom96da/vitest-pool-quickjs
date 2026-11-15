@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 import type { Snapshot } from "quickjs-wasi";
-import type { Plugin } from "rolldown";
+import type { InlineConfig, Plugin } from "vite";
 
 import type { Extension } from "./extensions.mts";
 
@@ -20,8 +20,20 @@ export interface QuickJSPoolOptions {
   preludes?: string[];
   /** Source of `node:*` modules by id. It wins over the modules that the pool provides. */
   modules?: Record<string, string>;
-  /** Rolldown plugins that apply to the modules the pool loads into the context. */
+  /**
+   * Vite plugins that apply to the modules the pool loads into the context. They are added after
+   * the plugins of the pool, and `enforce` can move them.
+   * @deprecated Use `vite.plugins`.
+   */
   plugins?: Plugin[];
+  /**
+   * Vite settings for the build of the worker. They are merged into the settings of the pool and
+   * win over them. The pool does not read the Vite config file of the project. Set `configFile`
+   * to a path, which starts at the root of the project, to take `resolve.alias`, `define` and
+   * `plugins` from that file, which runs with `command: "build"` and `mode: "test"`. The other
+   * settings of that file are ignored.
+   */
+  vite?: Omit<InlineConfig, "configFile"> & { configFile?: string };
   /**
    * Extensions of quickjs-wasi whose globals the tests can use, such as `url` for `URL`. The pool
    * loads `url` and `encoding` for vitest in any case, and the tests see what they define only

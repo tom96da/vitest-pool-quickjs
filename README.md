@@ -18,6 +18,11 @@ of Vitest.
 
 Powered by [quickjs-wasi](https://github.com/vercel-labs/quickjs-wasi).
 
+## Requirements
+
+- Node.js 22.18 or newer.
+- Vitest 5.0.3 or newer, and Vite 6.4, 7 or 8.
+
 ## Usage
 
 ```ts
@@ -36,53 +41,53 @@ export default defineConfig({
 
 ## Options
 
-| Option       | Description                                                                                        |
-| ------------ | -------------------------------------------------------------------------------------------------- |
-| `externals`  | Specifiers of the packages and relative files that a test imports.                                 |
-| `preludes`   | Paths of scripts that run in the context before the tests, to define globals.                      |
-| `modules`    | Source of `node:*` modules by id. It wins over the modules of the pool.                            |
-| `plugins`    | Rolldown plugins that apply to the modules that the pool loads into the context.                   |
-| `extensions` | Extensions of quickjs-wasi to load: `url`, `encoding`, `headers`, `crypto` and `structured-clone`. |
-| `snapshot`   | Start the test files from a snapshot of the first one to skip their setup. The default is `true`.  |
+| Option       | Description                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| `externals`  | Modules that a test imports and Vitest does not inline, such as a package from `node_modules`.          |
+| `preludes`   | Scripts that run in the context before the tests, to define globals. A path starts at the project root. |
+| `modules`    | Source of `node:*` modules by id. It replaces the module that the pool provides.                        |
+| `vite`       | Vite settings for the build of the externals and the modules. See [The Vite build](#the-vite-build).    |
+| `extensions` | Extensions of quickjs-wasi to load: `url`, `encoding`, `headers`, `crypto` and `structured-clone`.      |
+| `snapshot`   | Start the test files from a snapshot of the first one to skip their setup. The default is `true`.       |
 
-A test can import a package from `node_modules` or a relative file when `externals` lists it, for
-example:
-
-```ts
-quickjsPool({ externals: ["pathe"] });
-```
-
-An extension defines globals of the web. List the ones to use, for example:
+For example:
 
 ```ts
-quickjsPool({ extensions: ["structured-clone", "crypto"] });
+quickjsPool({ externals: ["pathe"], extensions: ["structured-clone", "crypto"] });
 ```
+
+## The Vite build
+
+The pool bundles the externals and the modules with Vite, without your Vite config. Your config
+still applies to the test files. Set the Vite settings for that build in `vite`, for example:
+
+```ts
+quickjsPool({ vite: { resolve: { alias: { "~": "/src" } } } });
+```
+
+To reuse a Vite config file, set `vite: { configFile: "vite.config.ts" }`. The path starts at the
+project root. The pool takes only `resolve.alias`, `define` and `plugins` from the file. `define`
+also applies to the code of Vitest. A config written as a function gets `mode: "test"`.
+The plugins may run more than once, so keep them free of side effects.
 
 ## Globals
 
-A test and the packages in `externals` see the globals of the engine, `process`, the timers and the
-globals of the extensions that the option lists.
+A test sees the standard built-ins of JavaScript, `console`, `performance`, `process`, the timers
+and the globals of the extensions that `extensions` lists. `process` has `env`, `versions`, `cwd`,
+`memoryUsage`, `stdout`, `stderr` and the methods for listeners.
 
-To have another global, define it in a module of `setupFiles`. A package in `externals` that reads
-the global while it loads needs it earlier, so define it in a script of `preludes` instead.
-
-The `define` option of Vitest stops the run with an error that names the global when it refers to
-one that is not defined.
+To add a global, define it in a setup file. A package in `externals` loads before the setup files,
+so if it reads the global while it loads, define the global in a script of `preludes`.
 
 ## Settings
 
-- Set `fsModuleCache: false`. Vitest 5.1 caches the transformed modules on the file system by
-  default and then sends the path of the file, which the context cannot read. The pool stops with an
-  error when the option is on.
+- Set `fsModuleCache: false`, as in the example. The pool stops with an error when it is on.
 
 ## Limits
 
 - With `isolate: false` one context holds the modules of every file.
 - A context has 1 GiB of memory.
 - Recursion deeper than about 1600 frames of a small function throws a `RangeError`.
-- The context has the globals of the engine, `process`, the timers and those of the extensions that
-  the option lists, and no others. `process` has `env`, `versions`, `cwd`, `memoryUsage`, `stdout`,
-  `stderr` and the methods for listeners.
 - The console does not print `time`, `timeEnd` and `timeLog`.
 - A method in a stack trace shows as `m` where V8 shows `Class.m`.
 - With `snapshot` on, a value that a script or a package makes while it loads, such as a random id

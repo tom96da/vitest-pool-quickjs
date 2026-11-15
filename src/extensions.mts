@@ -24,3 +24,9 @@ export const internalExtensions = {
 
 /** The globals that the pool defines itself, which no test sees. */
 export const ownGlobals = ["EventTarget", "Event", "AbortController"] as const;
+
+/**
+ * The hidden globals that vitest and the pool read. The prelude exports them, and the build gives
+ * them to the modules of vitest and of the pool in place of the global.
+ */
+export const injectedGlobals = [...ownGlobals, "URL", "TextDecoder"] as const;

@@ -32,13 +32,18 @@ const timeOf = (stdout: string) => (label: string) =>
  * Runs a fixture project with the pool.
  * @param name - the directory of the project under `tests/`
  * @param extra - more arguments for `vitest run`
+ * @param env - more environment variables
  * @returns the exit code and the two output streams
  */
-async function runFixture(name: string, extra: string[] = []): Promise<Report> {
+async function runFixture(
+  name: string,
+  extra: string[] = [],
+  env: Record<string, string> = {},
+): Promise<Report> {
   const args = [vitest, "run", "--root", path.join(root, "tests", name), ...extra];
   try {
     const { stdout, stderr } = await run(process.execPath, args, {
-      env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" },
+      env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0", ...env },
     });
     return { code: 0, stdout, stderr };
   } catch (error) {
@@ -259,7 +264,7 @@ describe.concurrent("projects that pass", () => {
     ["fixture-hidden", "Tests  4 passed (4)"],
     ["fixture-mock", "Tests  1 passed (1)"],
     ["fixture-node-modules", "Tests  10 passed (10)"],
-    ["fixture-options", "Tests  7 passed (7)"],
+    ["fixture-options", "Tests  9 passed (9)"],
     ["fixture-prelude", "Tests  1 passed (1)"],
     ["fixture-process", "Tests  13 passed (13)"],
     ["fixture-promise-matchers", "Tests  3 passed (3)"],
@@ -321,5 +326,62 @@ describe("two test files", () => {
     const at = timeOf(stdout);
     const [first, second] = at("end-a") < at("end-b") ? ["a", "b"] : ["b", "a"];
     expect(at(`end-${first}`)).toBeLessThanOrEqual(at(`start-${second}`));
+  });
+});
+
+describe("the configFile of the vite option", { timeout: 60_000 }, () => {
+  // the paths are relative, and this process does not run in the project, so the pool starts at its root
+  it("applies aliases, define and plugins, and runs the file once", async () => {
+    const { code, stdout } = await runFixture("fixture-vite-config", ["vite.fixture.mts"], {
+      VCFILE: "vite.config.mts",
+    });
+    expect(stdout).toContain("Tests  3 passed (3)");
+    expect(stdout.match(/CONFIG-LOADED/g)).toHaveLength(1);
+    expect(code).toBe(0);
+  });
+
+  it("leaves the settings of the build to the pool", async () => {
+    const { code, stdout } = await runFixture("fixture-vite-config", ["vite.fixture.mts"], {
+      VCFILE: "vite.ignored.config.mts",
+    });
+    expect(stdout).toContain("Tests  3 passed (3)");
+    expect(code).toBe(0);
+  });
+
+  it("yields to the other settings of the vite option", async () => {
+    const { code, stdout } = await runFixture("fixture-vite-config", ["inline.fixture.mts"], {
+      VCFILE: "vite.config.mts",
+      VINLINE: "1",
+    });
+    expect(stdout).toContain("Tests  1 passed (1)");
+    expect(code).toBe(0);
+  });
+
+  it("evaluates a config function in the test mode", async () => {
+    const { code, stdout } = await runFixture("fixture-vite-config", ["mode.fixture.mts"], {
+      VCFILE: "vite.mode.config.mts",
+    });
+    expect(stdout).toContain("Tests  1 passed (1)");
+    expect(code).toBe(0);
+  });
+
+  it("names the file that is missing", async () => {
+    const { code, stderr } = await runFixture("fixture-vite-config", ["vite.fixture.mts"], {
+      VCFILE: "none.mts",
+    });
+    expect(stderr).toContain(
+      `config file not found: ${path.join(root, "tests/fixture-vite-config/none.mts")}`,
+    );
+    expect(code).toBe(1);
+  });
+
+  it("keeps the error of a config that throws", async () => {
+    const { code, stderr } = await runFixture("fixture-vite-config", ["vite.fixture.mts"], {
+      VCFILE: "vite.throw.config.mts",
+    });
+    expect(stderr).toContain("could not load the config file");
+    // the pool asks Vite not to log it, so only the cause can carry it
+    expect(stderr).toContain("boom in the config file");
+    expect(code).toBe(1);
   });
 });
