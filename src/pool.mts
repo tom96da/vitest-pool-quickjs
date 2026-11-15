@@ -3,8 +3,8 @@
 
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 
 import type { PoolOptions, PoolRunnerInitializer, PoolWorker, WorkerRequest } from "vitest/node";
@@ -17,15 +17,16 @@ import { decode, encode } from "./worker/codec.mts";
 /** The thread that hosts one context. */
 const threadUrl = asset("thread");
 
+/** Vite 6's module runner rejects `import.meta.resolve`. */
+const resolve = createRequire(import.meta.url).resolve;
+
 /** The modules of quickjs-wasi, compiled once and shared with every thread. */
 const compiled = new Map<string, Promise<WebAssembly.Module>>();
 const compile = (specifier: string): Promise<WebAssembly.Module> => {
   if (!compiled.has(specifier)) {
     compiled.set(
       specifier,
-      readFile(fileURLToPath(import.meta.resolve(specifier))).then((bytes) =>
-        WebAssembly.compile(bytes),
-      ),
+      readFile(resolve(specifier)).then((bytes) => WebAssembly.compile(bytes)),
     );
   }
   return compiled.get(specifier)!;
