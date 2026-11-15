@@ -5,6 +5,6 @@ import { defineProject } from "vitest/config";
 
 export default defineProject({
   test: {
-    include: ["tests/*.test.mts"],
+    include: ["src/**/__tests__/*.test.mts", "tests/*.test.mts"],
   },
 });

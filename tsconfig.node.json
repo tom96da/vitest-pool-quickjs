@@ -4,6 +4,7 @@
   "include": [
     "src/*.mts",
     "src/worker/codec.mts",
+    "src/**/__tests__/*.mts",
     "tests/*.mts",
     "scripts",
     "types/node-*.d.mts",

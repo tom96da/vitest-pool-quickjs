@@ -11,5 +11,6 @@
     "tests/**/*.fixture.mts",
     "tests/fixture-helpers.mts",
     "types/quickjs-*.d.mts"
-  ]
+  ],
+  "exclude": ["src/**/__tests__"]
 }

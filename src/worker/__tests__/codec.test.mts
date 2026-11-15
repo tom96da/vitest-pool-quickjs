@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { decode, encode } from "../src/worker/codec.mts";
+import { decode, encode } from "../codec.mts";
 
 /**
  * Sends a value through the codec.
