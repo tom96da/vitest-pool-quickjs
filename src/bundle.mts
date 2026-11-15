@@ -366,6 +366,8 @@ async function bundle(
       // project file such as `default-cjs.js` is CommonJS without a telling extension.
       commonjsOptions: { include: [/\.[cm]?js$/] },
       lib: { entry: input, formats: ["iife"], name: "__worker", fileName: "worker" },
+      // rolldown leaves the script sloppy unless it is told, and rollup makes it strict
+      rollupOptions: { output: { strict: true } },
     },
   };
   const config = mergeConfig(defaults, vite);

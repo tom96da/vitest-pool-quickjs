@@ -385,3 +385,25 @@ describe("the configFile of the vite option", { timeout: 60_000 }, () => {
     expect(code).toBe(1);
   });
 });
+
+describe("the strict mode of the script", { timeout: 60_000 }, () => {
+  it("gives a plain call no this", async () => {
+    const { code, stdout } = await runFixture("fixture-strict", ["contexts.fixture.mts"]);
+    expect(stdout).toContain("Tests  1 passed (1)");
+    expect(code).toBe(0);
+  });
+
+  it("fails a package that assigns an undeclared global", async () => {
+    const { code, stdout, stderr } = await runFixture("fixture-strict", ["leak.fixture.mts"]);
+    expect(stdout + stderr).toContain("leakedByPackage is not defined");
+    expect(code).toBe(1);
+  });
+
+  it("lets a project turn it off in the vite option", async () => {
+    const { code, stdout } = await runFixture("fixture-strict", ["leak.fixture.mts"], {
+      SLOPPY: "1",
+    });
+    expect(stdout).toContain("Tests  1 passed (1)");
+    expect(code).toBe(0);
+  });
+});
