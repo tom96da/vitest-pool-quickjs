@@ -211,8 +211,6 @@ try {
     takeEntry();
     rejections = entry.getProp("rejections");
     for (const line of snapshot.output) report(line);
-    // the time origin is the one of this thread
-    run("performance.timeOrigin = Date.now() - performance.now();", "restore.js");
   } else {
     rejections = vm.newObject();
     const host = vm.newObject();

@@ -5,12 +5,11 @@
     "paths": { "node:*": ["./src/shims/*.mts"] }
   },
   "include": [
+    "src/shims/*.mts",
     "src/worker.mts",
-    "src/worker/**/*",
-    "src/shims/**/*",
-    "tests/**/*.fixture.mts",
-    "tests/fixture-helpers.mts",
+    "src/worker/*.mts",
+    "tests/*.mts",
     "types/quickjs-*.d.mts"
   ],
-  "exclude": ["src/**/__tests__"]
+  "exclude": ["tests/bundle.*.mts"]
 }

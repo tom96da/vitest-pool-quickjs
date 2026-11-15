@@ -22,7 +22,7 @@ const resolve = createRequire(import.meta.url).resolve;
 
 /** The modules of quickjs-wasi, compiled once and shared with every thread. */
 const compiled = new Map<string, Promise<WebAssembly.Module>>();
-const compile = (specifier: string): Promise<WebAssembly.Module> => {
+export const compile = (specifier: string): Promise<WebAssembly.Module> => {
   if (!compiled.has(specifier)) {
     compiled.set(
       specifier,

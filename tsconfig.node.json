@@ -2,11 +2,12 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": { "types": ["node"] },
   "include": [
-    "src/*.mts",
-    "src/worker/codec.mts",
-    "src/**/__tests__/*.mts",
-    "tests/*.mts",
     "scripts",
+    "src/worker/codec.mts",
+    "src/*.mts",
+    "src/**/__tests__",
+    "tests/shims",
+    "tests/bundle.*.mts",
     "types/node-*.d.mts",
     "*.mts"
   ],

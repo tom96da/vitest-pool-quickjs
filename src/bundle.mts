@@ -342,6 +342,7 @@ async function bundle(
     configFile: false,
     envDir: false,
     publicDir: false,
+    logLevel: "silent",
     customLogger: {
       info() {},
       warn,
@@ -384,7 +385,7 @@ async function bundle(
       `the build of the worker made ${result.length} outputs, and it needs one script. ` +
         "do not set build.lib.formats in the vite option",
     );
-  const { output } = (Array.isArray(result) ? result[0]! : result) as Rollup.RollupOutput;
+  const { output } = (Array.isArray(result) ? result[0]! : result) as Rollup.RolldownOutput;
   // more than one chunk, from a dynamic import for instance, cannot run as one script
   const chunks = output.filter((item) => item.type === "chunk");
   if (chunks.length !== 1)
@@ -523,7 +524,7 @@ export const pickConfig = (config: UserConfig): InlineConfig => ({
  * @param file - the path of the file
  * @returns the settings
  */
-async function loadConfig(root: string, file: string): Promise<InlineConfig> {
+export async function loadConfig(root: string, file: string): Promise<InlineConfig> {
   const absolute = path.resolve(root, file);
   await access(absolute).catch(() => {
     throw new Error(`config file not found: ${absolute}`);

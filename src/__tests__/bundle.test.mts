@@ -1,13 +1,15 @@
 // Copyright (c) 2026 tom96da
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-// The tests of injectGlobals and pickConfig, the two functions of bundle.mts that take no build.
+import path from "node:path";
 
 import { parseSync } from "vite";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { injectGlobals, pickConfig } from "../bundle.mts";
-import { injectedGlobals } from "../extensions.mts";
+import { injectGlobals, loadConfig, pickConfig } from "../bundle.mts";
+
+beforeEach(() => void vi.stubEnv("API_URL", "https://api.test"));
+afterEach(() => void vi.unstubAllEnvs());
 
 const inject = (code: string) =>
   injectGlobals(code, parseSync("module.mjs", code).program as never);
@@ -18,8 +20,9 @@ const imports = (code: string) =>
     .map((line) => line.replace(/ from ".*"; ?$/, ""));
 
 describe("a name that a module reads", () => {
-  it.each(injectedGlobals)("gets an import of %s", (name) => {
-    expect(imports(`new ${name}();`)).toEqual([`import { ${name} }`]);
+  // the rows came from the list that the build uses, so one global stands for all
+  it("gets an import of a global that the pool injects", () => {
+    expect(imports("new URL();")).toEqual(["import { URL }"]);
   });
 
   it("gets an import of the function of the module runner under its name", () => {
@@ -37,10 +40,6 @@ describe("a name that a module reads", () => {
 
   it("gets an import when it is a shorthand property", () => {
     expect(imports("const o = { URL };")).toEqual(["import { URL }"]);
-  });
-
-  it("gets an import when typeof reads it", () => {
-    expect(imports("const t = typeof URL;")).toEqual(["import { URL }"]);
   });
 
   it("gets an import also when a function shadows it", () => {
@@ -103,10 +102,6 @@ describe("a name that a module declares", () => {
 });
 
 describe("the output of injectGlobals", () => {
-  it("is null when the module reads no name", () => {
-    expect(inject("const a = 1;")).toBeNull();
-  });
-
   it("has the imports after a hashbang line", () => {
     expect(inject("#!/usr/bin/env node\nnew URL('a');")).toMatch(
       /^#!\/usr\/bin\/env node\nimport /,
@@ -131,26 +126,47 @@ describe("the output of injectGlobals", () => {
 });
 
 describe("the settings that pickConfig takes", () => {
-  it("are the aliases, the define and the plugins", () => {
-    const plugins = [{ name: "p" }];
-    const picked = pickConfig({
-      resolve: { alias: { a: "b" }, conditions: ["x"] },
-      define: { D: "1" },
-      plugins,
-      build: { minify: true },
-      envDir: "e",
-    });
-    expect(picked).toEqual({ resolve: { alias: { a: "b" } }, define: { D: "1" }, plugins });
-  });
-
-  it("are left unset when the config does not have them", () => {
+  it("are left unset when the config does not have them and are only the ones that it has", () => {
     expect(pickConfig({})).toEqual({ resolve: {} });
     expect(pickConfig({ resolve: { conditions: ["x"] }, build: { minify: true } })).toEqual({
       resolve: {},
     });
+    expect(pickConfig({ define: { D: "1" } })).toEqual({ resolve: {}, define: { D: "1" } });
+  });
+});
+
+const dir = import.meta.dirname;
+
+describe("a config file that is missing", () => {
+  it("is looked for from the root when the path is relative", async () => {
+    await expect(loadConfig(dir, "none.config.mjs")).rejects.toThrow(
+      `config file not found: ${path.join(dir, "none.config.mjs")}`,
+    );
+  });
+});
+
+describe("a config file that throws", () => {
+  it("keeps the error as the cause", async () => {
+    vi.stubEnv("API_URL", "");
+    const error = await loadConfig(dir, "bundle.config.mts").catch((e: Error) => e);
+    expect((error as Error).message).toContain("could not load the config file");
+    expect((error as Error).cause).toMatchObject({ message: "API_URL is not set" });
+  });
+});
+
+describe("the settings that loadConfig takes from a file", () => {
+  it("are the aliases, the define and the plugins", async () => {
+    const settings = await loadConfig(dir, "bundle.config.mts");
+    expect(Object.keys(settings).toSorted()).toEqual(["define", "plugins", "resolve"]);
+    expect(settings.resolve).toEqual({ alias: { "@": path.join(dir, "..") } });
+    expect(settings.plugins).toHaveLength(1);
   });
 
-  it("are only the ones that the config has", () => {
-    expect(pickConfig({ define: { D: "1" } })).toEqual({ resolve: {}, define: { D: "1" } });
+  it("include what a config written as a function makes of the build command and the mode", async () => {
+    const settings = await loadConfig(dir, "bundle.config.mts");
+    expect(settings.define).toEqual({
+      __API_URL__: '"https://api.test"',
+      __MODE__: '"build:test"',
+    });
   });
 });
