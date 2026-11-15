@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - hide the globals that the pool provides for Vitest from the tests and the packages of `externals` ([91b8f43](https://github.com/tom96da/vitest-pool-quickjs/commit/91b8f43))
 - build with the Vite of the project in place of Rolldown, which needs Vite 6.4, 7 or 8 ([d87360e](https://github.com/tom96da/vitest-pool-quickjs/commit/d87360e))
 - take Vite plugins in `plugins` in place of Rolldown plugins ([d87360e](https://github.com/tom96da/vitest-pool-quickjs/commit/d87360e))
+- run the code of the externals and of Vitest in strict mode ([f087a3f](https://github.com/tom96da/vitest-pool-quickjs/commit/f087a3f))
 
 ### Deprecated
 
