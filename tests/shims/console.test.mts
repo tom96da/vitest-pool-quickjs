@@ -273,3 +273,28 @@ it("starts the count again after countReset", async () => {
   `);
   expect(shim).toEqual(await node);
 });
+
+it.each([
+  { call: 'console.log(0, "->", 1, "x")' },
+  { call: 'console.log(true, "ok")' },
+  { call: `console.log(1, "it's")` },
+  { call: 'console.log(undefined, "x")' },
+])("writes the strings of $call as they are", async ({ call }) => {
+  const { node, shim } = await evaluate(dedent`
+    import { Console } from "node:console";
+    import { Writable } from "node:stream";
+    const out = [];
+    const err = [];
+    const sink = (chunks) =>
+      new Writable({
+        write(data, encoding, callback) {
+          chunks.push(String(data));
+          callback();
+        },
+      });
+    const console = new Console({ stdout: sink(out), stderr: sink(err), groupIndentation: 2 });
+    ${call};
+    export default out;
+  `);
+  expect(shim).toEqual(await node);
+});

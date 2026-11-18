@@ -21,7 +21,12 @@ export class Console {
     this.streams = streams;
   }
   private out(to: "stdout" | "stderr", args: unknown[]): void {
-    const text = (args.length ? format(args) : "").replace(/^/gm, this.indent);
+    // after a first argument that is no string, format would quote each string that follows
+    const joined =
+      typeof args[0] === "string"
+        ? format(args)
+        : args.map((a) => (typeof a === "string" ? a : format([a]))).join(" ");
+    const text = joined.replace(/^/gm, this.indent);
     this.streams[to].write(`${text}\n`);
   }
   private step(): number {
