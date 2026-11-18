@@ -6,6 +6,7 @@ import events, { EventEmitter } from "node:events";
 import { METHODS, STATUS_CODES, createServer, maxHeaderSize } from "node:http";
 import os from "node:os";
 import * as perfHooks from "node:perf_hooks";
+import { setTimeout } from "node:timers/promises";
 import v8 from "node:v8";
 
 import { describe, expect, it } from "vitest";
@@ -58,6 +59,14 @@ describe("node modules of the pool", () => {
     ["a boolean of an inert module as it is", () => isPrimary, true],
   ])("exports %s", (_name, actual, expected) => {
     expect(actual()).toEqual(expected);
+  });
+});
+
+describe("node:timers/promises", () => {
+  it("waits for the delay on the timers of the context", async () => {
+    const start = performance.now();
+    await setTimeout(100);
+    expect(performance.now() - start).toBeGreaterThanOrEqual(90);
   });
 });
 
