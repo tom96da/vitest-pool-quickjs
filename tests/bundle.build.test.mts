@@ -52,3 +52,21 @@ describe("a second format of the vite option", () => {
     await expect(buildWorker(dir, { vite })).rejects.toThrow("needs one script");
   });
 });
+
+describe("an entry of the externals option that the root does not resolve", () => {
+  it("is rejected with the option, the entry and the root, for a mistyped path", async () => {
+    const error = await buildWorker(dir, { externals: ["./src/missing.js"] }).catch((e) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain("externals option");
+    expect(error.message).toContain('"./src/missing.js"');
+    expect(error.message).toContain(dir);
+  });
+
+  it("is rejected with the option, the entry and the root, for a package that is not installed", async () => {
+    const error = await buildWorker(dir, { externals: ["not-installed-pkg"] }).catch((e) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain("externals option");
+    expect(error.message).toContain('"not-installed-pkg"');
+    expect(error.message).toContain(dir);
+  });
+});

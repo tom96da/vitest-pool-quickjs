@@ -121,9 +121,10 @@ function nodeModules(modules: Record<string, string>, shims: Set<string>): Plugi
  * Serves `virtual:externals`: the listed modules, by specifier and by resolved path.
  * @param specifiers - the specifiers of the modules
  * @param root - the directory that the specifiers resolve from
+ * @param unresolved - receives the message of the error when a specifier does not resolve
  * @returns the plugin
  */
-function externalModules(specifiers: string[], root: string): Plugin {
+function externalModules(specifiers: string[], root: string, unresolved: string[]): Plugin {
   const id = "\0virtual:externals";
   return {
     name: "vitest-pool-quickjs:externals",
@@ -134,8 +135,10 @@ function externalModules(specifiers: string[], root: string): Plugin {
       if (loaded !== id) return null;
       const imports: string[] = [];
       const entries: string[] = [];
+      const missing: string[] = [];
       for (const [i, specifier] of specifiers.entries()) {
         const found = await this.resolve(specifier, path.join(root, "noop.mts"));
+        if (!found) missing.push(JSON.stringify(specifier));
         // rollup's commonjs plugin answers with a proxy id, `\0<path>?commonjs-es-import`
         const resolved = found && { id: found.id.replace(/^\0(.*)\?commonjs-[\w-]+$/, "$1") };
         // resolve from the project root: the generated module has no directory of its own
@@ -143,6 +146,11 @@ function externalModules(specifiers: string[], root: string): Plugin {
         imports.push(`import * as e${i} from ${JSON.stringify(from)};`);
         entries.push(`[${JSON.stringify(specifier)}, e${i}]`);
         if (resolved) entries.push(`[${JSON.stringify(resolved.id)}, e${i}]`);
+      }
+      if (missing.length > 0) {
+        const message = `cannot resolve ${missing.join(", ")} in the externals option from ${root}`;
+        unresolved.push(message);
+        this.error(message);
       }
       // the prelude runs before the packages, which read the globals of the context while they load
       return dedent`
@@ -573,8 +581,9 @@ export async function buildWorker(
     configFile === undefined ? inline : mergeConfig(await loadConfig(root, configFile), inline);
   const shims = await shimNames();
   const input = fileURLToPath(asset("worker"));
+  const unresolved: string[] = [];
   const pool = (listed: string[]): Plugin[] => [
-    externalModules(listed, root),
+    externalModules(listed, root, unresolved),
     nodeModules(modules, shims),
     externalImport,
     plainStack(),
@@ -587,5 +596,16 @@ export async function buildWorker(
     externals.length > 0
       ? await ownModules(root, input, [...pool([]), ...plugins], settings)
       : null;
-  return bundle(root, input, [...pool(externals), capturedGlobals(own), ...plugins], settings);
+  try {
+    return await bundle(
+      root,
+      input,
+      [...pool(externals), capturedGlobals(own), ...plugins],
+      settings,
+    );
+  } catch (error) {
+    // the text of the build repeats the message and names the virtual module
+    if (unresolved.length > 0) throw new Error(unresolved[0]!);
+    throw error;
+  }
 }
