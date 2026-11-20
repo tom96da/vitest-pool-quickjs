@@ -40,19 +40,11 @@ const captured = new Map<string, string>([
 ]);
 
 /**
- * Names the file of a shim by the name of its module. A name with a slash, such as
- * `timers/promises`, has a dot in its file name, so that the files lie in one directory.
- * @param name - the module name without the `node:` prefix
- * @returns the file name without the extension
- */
-const shimFile = (name: string): string => name.replaceAll("/", ".");
-
-/**
  * Locates the module that replaces a `node:*` module.
  * @param name - the module name without the `node:` prefix
  * @returns the absolute file path
  */
-const shim = (name: string): string => fileURLToPath(asset(`shims/${shimFile(name)}`));
+const shim = (name: string): string => fileURLToPath(asset(`shims/${name}`));
 
 /** The names of the built-ins that the package replaces with a module of its own. */
 const shimNames = async (): Promise<Set<string>> =>
@@ -105,7 +97,7 @@ function nodeModules(modules: Record<string, string>, shims: Set<string>): Plugi
     resolveId(id) {
       if (!id.startsWith("node:")) return null;
       const name = id.slice("node:".length);
-      return shims.has(shimFile(name)) && !(id in modules) ? shim(name) : `\0${id}`;
+      return shims.has(name) && !(id in modules) ? shim(name) : `\0${id}`;
     },
     load(id) {
       if (!id.startsWith("\0node:")) return null;

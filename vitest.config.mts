@@ -53,7 +53,6 @@ export default defineConfig({
               "./tests/externals.probe.cjs",
               "./tests/externals.main.cjs",
               "node:perf_hooks",
-              "node:timers/promises",
               "node:os",
               "node:v8",
               "node:cluster",

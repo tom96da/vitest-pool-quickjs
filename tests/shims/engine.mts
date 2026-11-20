@@ -3,7 +3,6 @@
 
 import { EvalFlags, QuickJS } from "quickjs-wasi";
 import type { HostFunction } from "quickjs-wasi";
-import { dedent } from "ts-dedent";
 import { inject } from "vitest";
 
 import type { Extension } from "../../src/extensions.mts";
@@ -52,26 +51,6 @@ export async function load({
   }
   // the prelude gives the context a process, which the formatter of vitest reads while it loads
   vm.evalCode("globalThis.process = { env: {} };", "process.js");
-  // the prelude gives the context timers, which Node backs here
-  const wait = vm.newFunction("wait", (delay) => {
-    const deferred = vm.newPromise();
-    setTimeout(() => {
-      vm.withScope(() => deferred.resolve(vm.undefined));
-      while (vm.executePendingJobs() > 0);
-    }, delay.toNumber());
-    return deferred.handle;
-  });
-  vm.setProp(vm.global, "__wait", wait);
-  vm.evalCode(
-    dedent`
-      const wait = globalThis.__wait;
-      delete globalThis.__wait;
-      globalThis.setTimeout = (callback, delay, ...args) => {
-        wait(Number(delay) || 0).then(() => callback(...args));
-      };
-    `,
-    "timers.js",
-  );
   const run = async (code: string): Promise<unknown> => {
     sources["test:main"] = code;
     const pending = vm.resolvePromise(

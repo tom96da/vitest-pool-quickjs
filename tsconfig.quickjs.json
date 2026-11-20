@@ -2,10 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "types": [],
-    "paths": {
-      "node:timers/promises": ["./src/shims/timers.promises.mts"],
-      "node:*": ["./src/shims/*.mts"]
-    }
+    "paths": { "node:*": ["./src/shims/*.mts"] }
   },
   "include": [
     "src/shims/*.mts",

@@ -44,11 +44,7 @@ async function buildShims(files: string[]): Promise<Record<string, string>> {
   // a chunk that two shims share would have to be served too, so the build must not make one
   if (output.length !== files.length) throw new Error("the shims share a chunk");
   return Object.fromEntries(
-    (output as Rolldown.OutputChunk[]).map(({ name, code }) => [
-      // the file of node:timers/promises is timers.promises
-      `node:${name.replaceAll(".", "/")}`,
-      code,
-    ]),
+    output.map((chunk) => [`node:${chunk.name}`, (chunk as Rolldown.OutputChunk).code]),
   );
 }
 
