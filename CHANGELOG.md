@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - drop the members of `process` that Vitest does not require ([91b8f43](https://github.com/tom96da/vitest-pool-quickjs/commit/91b8f43))
 - drop the dependency on `rolldown` ([d87360e](https://github.com/tom96da/vitest-pool-quickjs/commit/d87360e))
 
+### Fixed
+
+- stop quoting the strings that follow a number or a boolean in the console output of a test run ([5a990a0](https://github.com/tom96da/vitest-pool-quickjs/commit/5a990a0))
+- stop hiding which entry of the `externals` option keeps a test run from starting ([32d59f1](https://github.com/tom96da/vitest-pool-quickjs/commit/32d59f1))
+
 ## [0.2.4] - 2026-11-14
 
 ### Added
